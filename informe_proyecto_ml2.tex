@@ -1,0 +1,286 @@
+\documentclass[12pt,letterpaper]{article}
+
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{amsmath}
+
+\geometry{margin=2.5cm}
+\setstretch{1.15}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    citecolor=black
+}
+
+\title{\textbf{Proyecto de Machine Learning II}\\
+\large Primera entrega: comprensión del artículo y planteamiento}
+
+\author{
+    Julian Duarte \\
+    Julian Jimenez
+}
+
+\date{Machine Learning II\\
+21 de agosto de 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Este documento presenta el primer avance del proyecto de Machine Learning II. Se resume el
+artículo base, se plantea el problema predictivo, se describe la estrategia de datos y se propone
+un plan inicial de modelamiento. La idea es construir una base clara, sencilla y sustentable para
+las siguientes etapas del trabajo.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Introducción}
+
+El proyecto parte de un artículo científico que sirve como referencia para plantear un problema
+predictivo propio. En nuestro caso, el artículo base es
+\textit{Crypto Price Prediction Using LSTM+XGBoost}, de Gautam \cite{gautam2025}.
+El trabajo estudia la predicción de precios de criptomonedas y propone un modelo híbrido que
+combina una red LSTM con XGBoost.
+
+Nuestro interés es adaptar esa idea al contexto colombiano usando herramientas vistas en el
+curso. Por ahora no implementaremos LSTM; tomaremos del artículo su problema central, sus
+variables financieras y el uso de XGBoost. Para representar la información temporal,
+construiremos variables rezagadas, retornos, volatilidad, medias móviles e indicadores técnicos.
+Además, compararemos el enfoque de Machine Learning contra modelos clásicos de series de
+tiempo, como ARIMA o Prophet, si el alcance y los datos lo permiten.
+
+Esta primera entrega resume cuatro elementos: comprensión del artículo, planteamiento del
+problema, estrategia de datos y plan inicial de modelamiento con una línea base.
+
+\section{Artículo base}
+
+El artículo seleccionado aborda el problema de predecir precios de criptomonedas en mercados
+altamente volátiles. Activos como Bitcoin, Ethereum, Dogecoin y Litecoin no se comportan de
+forma estable, pues sus precios reaccionan a cambios en volumen de negociación, sentimiento del
+mercado, indicadores macroeconómicos, eventos externos y movimientos especulativos.
+
+La propuesta del artículo es un modelo híbrido LSTM+XGBoost. La LSTM se usa para capturar
+dependencias temporales en las series de precios, es decir, patrones que dependen de lo ocurrido
+en días anteriores. Luego, XGBoost se usa para modelar relaciones no lineales entre las
+características extraídas y el precio futuro. Además de precios históricos, el artículo menciona
+variables como volumen, capitalización de mercado, indicadores técnicos, sentimiento e
+información macroeconómica.
+
+El artículo evalúa el modelo sobre varias criptomonedas: Bitcoin, Ethereum, Dogecoin y
+Litecoin. Las variables principales del conjunto de datos son fecha, precio de apertura, precio
+máximo, precio mínimo, precio de cierre, volumen y capitalización de mercado. También se
+analizan patrones de volatilidad, correlación entre criptomonedas, distribución de retornos y
+relación entre precio y volumen.
+
+Los resultados reportados muestran que el modelo híbrido obtiene mejor desempeño que modelos
+individuales como ARIMA, CNN, LSTM y XGBoost. Según la Tabla II del artículo, el
+modelo LSTM+XGBoost alcanza un MAPE de 0.0488 y un MinMax RMSE de 0.0659, mientras que
+XGBoost por sí solo obtiene un MAPE de 0.0533 y un MinMax RMSE de 0.0705. Esto sugiere que
+la combinación de memoria temporal y ensambles puede mejorar la predicción.
+
+Para nuestro trabajo, una limitación importante es que el artículo trabaja principalmente con
+datos globales y no desarrolla a fondo una adaptación local para Colombia o América Latina.
+Por eso, nuestra adaptación se enfocará en conservar la lógica predictiva del problema y el uso
+de XGBoost, pero reemplazando la LSTM por ingeniería de variables temporales y modelos
+avanzados del curso.
+
+\section{Planteamiento inicial del problema}
+
+La pregunta predictiva inicial del proyecto será:
+
+\begin{quote}
+¿Qué tan bien pueden los modelos avanzados de Machine Learning II predecir el precio o retorno
+de corto plazo de una canasta de criptomonedas relevante para un inversionista colombiano,
+usando información histórica de precios, volumen, volatilidad, indicadores técnicos y tasa de
+cambio?
+\end{quote}
+
+El problema se plantea como una tarea de \textbf{regresión}, porque la variable objetivo será
+numérica. De forma inicial, proponemos dos posibles variables objetivo, que serán revisadas
+antes de la segunda entrega. La primera opción es el precio de cierre del siguiente periodo,
+expresado en pesos colombianos:
+
+\[
+y_t = \text{Close}_{t+h}^{COP}
+\]
+
+La segunda opción es trabajar con el retorno porcentual:
+
+\[
+r_{t+h} = \frac{\text{Close}_{t+h} - \text{Close}_t}{\text{Close}_t}
+\]
+
+El horizonte \(h\) puede ser de 1 hora, 4 horas o 24 horas, dependiendo de la calidad y
+disponibilidad final de los datos. También podremos calcular como análisis complementario si el
+modelo acierta la dirección del movimiento, aunque la tarea principal seguirá siendo regresión.
+
+La relevancia del problema en Colombia está en que cada vez más personas acceden a
+criptomonedas como alternativa de inversión, ahorro o especulación. Para un usuario colombiano,
+el precio en dólares no cuenta toda la historia, porque también influye la tasa de cambio
+USD/COP. Por eso queremos trabajar el precio en pesos colombianos o incluir la tasa de cambio
+como variable explicativa.
+
+Del artículo reproduciremos y adaptaremos tres ideas principales: el uso de variables históricas
+de mercado, el uso de XGBoost para relaciones no lineales y la comparación de modelos mediante
+métricas de error como MAPE y RMSE normalizado.
+
+\section{Estrategia de datos}
+
+La estrategia inicial será trabajar con un \textbf{dataset real}, complementado con variables
+construidas por nosotros. No vemos necesario simular datos en esta primera fase, porque existen
+fuentes públicas suficientes para reconstruir la información. Para precios de criptomonedas
+podemos usar la librería \texttt{yfinance} de Yahoo Finance o la API pública de Binance. Binance
+permite descargar velas históricas mediante el endpoint de \textit{klines} o
+\textit{candlesticks}, mientras que Yahoo Finance facilita una extracción rápida desde Python.
+
+La frecuencia preferida será horaria, porque permite trabajar con suficientes registros. Al usar
+dos o tres criptomonedas se puede construir un panel más robusto.
+
+Las criptomonedas candidatas son Bitcoin, Ethereum, Litecoin y Dogecoin, porque son las mismas
+que aparecen en el artículo base y tienen suficiente historia pública. También podríamos evaluar
+BNB o Solana si los datos de Binance resultan más completos para esos activos. Las variables
+originales esperadas son:
+
+\begin{itemize}
+    \item Fecha o marca temporal.
+    \item Criptomoneda o símbolo.
+    \item Precio de apertura.
+    \item Precio máximo.
+    \item Precio mínimo.
+    \item Precio de cierre.
+    \item Volumen negociado.
+    \item Capitalización de mercado, si está disponible.
+\end{itemize}
+
+Para adaptar el problema a Colombia, construiremos o agregaremos variables relacionadas con la
+tasa de cambio USD/COP. La fuente local puede ser la TRM publicada por el Banco de la
+República o una serie equivalente disponible desde Yahoo Finance. Con esto podremos expresar
+el precio de cierre en pesos colombianos y no solo en dólares. Además, construiremos variables
+derivadas como:
+
+\begin{itemize}
+    \item Retornos diarios o porcentuales.
+    \item Rezagos del precio de cierre, por ejemplo de 1, 3, 7 y 14 días.
+    \item Promedios móviles.
+    \item Volatilidad móvil.
+    \item Relación entre precio máximo y mínimo.
+    \item Cambios porcentuales en volumen.
+    \item Indicadores técnicos simples como RSI o MACD, si no complican demasiado el alcance.
+\end{itemize}
+
+La calidad inicial de los datos se evaluará revisando valores faltantes, fechas repetidas,
+registros atípicos, cambios bruscos y consistencia temporal. Un punto importante será alinear
+frecuencias, porque el mercado cripto opera 24/7, mientras que la TRM colombiana se publica
+en días hábiles. Para resolver esto podríamos usar el último valor disponible de la TRM
+(\textit{forward-fill}), dejando documentado el supuesto. Como se trata de series de tiempo,
+será importante no mezclar aleatoriamente observaciones del futuro con observaciones del pasado.
+La partición de entrenamiento y prueba se hará respetando el orden temporal.
+
+Por ahora no proponemos una simulación completa, porque el fenómeno financiero tiene datos
+reales disponibles y es más defendible trabajar sobre precios históricos.
+
+\section{Plan inicial de modelamiento}
+
+El flujo de modelamiento se construirá de forma reproducible en Python, usando herramientas
+como \texttt{pandas}, \texttt{scikit-learn}, \texttt{yfinance}, \texttt{xgboost} y, si usamos
+Binance, una conexión a su API pública. La idea es organizar las transformaciones y los modelos
+en un flujo claro, evitando fuga de información.
+
+La primera línea base será un modelo simple de persistencia:
+
+\[
+\hat{y}_t = \text{Close}_{t}^{COP}
+\]
+
+Es decir, para predecir el precio de mañana, la línea base dirá que será igual al precio de hoy.
+Esta línea base es razonable en series financieras porque muchas veces es difícil superar una
+predicción ingenua de último valor observado. También podremos comparar contra una regresión
+lineal o un árbol de decisión simple, como modelos del nivel de Machine Learning I.
+
+Adicionalmente, consideraremos modelos clásicos de series de tiempo como ARIMA y Prophet.
+Estos modelos servirán como referencia para saber si los ensambles realmente aportan frente a
+técnicas tradicionales de pronóstico.
+
+Los modelos avanzados candidatos serán:
+
+\begin{itemize}
+    \item Árboles de decisión con control de complejidad.
+    \item Random Forest.
+    \item AdaBoost.
+    \item Gradient Boosting.
+    \item XGBoost, como adaptación principal del artículo.
+    \item Support Vector Regression, si el tamaño de los datos lo permite.
+    \item ARIMA o Prophet como modelos comparativos de series de tiempo.
+\end{itemize}
+
+La métrica principal será el \textbf{MAPE}, porque permite interpretar el error como porcentaje y
+compararlo con el artículo. También reportaremos RMSE o RMSE normalizado, porque penaliza más
+los errores grandes y es útil en un mercado con alta volatilidad. Si trabajamos con precios en
+COP, el RMSE normalizado será importante para no depender únicamente de la escala monetaria.
+
+La validación respetará la estructura temporal de los datos. No usaremos una partición aleatoria
+simple, porque eso podría causar fuga de información: datos del futuro terminarían ayudando a
+predecir el pasado. En su lugar, usaremos una división cronológica entre entrenamiento,
+validación y prueba, y para ajuste de hiperparámetros consideraremos validación tipo
+\textit{walk-forward} o \texttt{TimeSeriesSplit}.
+
+El preprocesamiento también debe evitar fuga de datos. Por ejemplo, si escalamos variables o
+imputamos valores, esos parámetros se deben aprender solo con el conjunto de entrenamiento y
+luego aplicarse al conjunto de validación o prueba. Para eso usaremos objetos tipo
+\texttt{Pipeline} cuando sea posible.
+
+\section{Conclusiones preliminares}
+
+En esta primera fase definimos una ruta inicial para el proyecto. El artículo base propone un
+modelo híbrido LSTM+XGBoost para predecir precios de criptomonedas y reporta mejores
+resultados que varios modelos individuales. Nuestra adaptación se concentrará en XGBoost,
+otros modelos avanzados vistos en Machine Learning II y una comparación contra modelos
+clásicos de series de tiempo como ARIMA o Prophet.
+
+El problema se formulará como una regresión para predecir el precio o retorno de corto plazo
+en pesos colombianos. Esta decisión mantiene relación con el artículo, pero agrega una mirada
+local al considerar el efecto de la tasa de cambio USD/COP. El siguiente paso será consolidar el
+dataset desde Yahoo Finance o Binance, construir las variables rezagadas e indicadores técnicos,
+implementar la línea base y comparar los modelos con una validación temporal rigurosa.
+
+\begin{thebibliography}{9}
+
+\bibitem{gautam2025}
+Gautam, M. (2025).
+\textit{Crypto Price Prediction Using LSTM+XGBoost}.
+arXiv:2506.22055.
+
+\bibitem{chen2016}
+Chen, T. y Guestrin, C. (2016).
+\textit{XGBoost: A Scalable Tree Boosting System}.
+Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining.
+
+\bibitem{box2015}
+Box, G. E. P., Jenkins, G. M., Reinsel, G. C. y Ljung, G. M. (2015).
+\textit{Time Series Analysis: Forecasting and Control}.
+Wiley.
+
+\bibitem{taylor2018}
+Taylor, S. J. y Letham, B. (2018).
+\textit{Forecasting at scale}.
+The American Statistician, 72(1), 37--45.
+
+\bibitem{curso2026}
+Pineda, W. (2026).
+\textit{Machine Learning II: material público del curso}.
+\url{https://wilmerpineda.github.io/machine_learning_ii_course_public/}
+
+\end{thebibliography}
+
+\end{document}
