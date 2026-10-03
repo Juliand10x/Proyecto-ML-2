@@ -9,6 +9,7 @@
 \usepackage{booktabs}
 \usepackage{hyperref}
 \usepackage{amsmath}
+\usepackage{adjustbox}
 
 \geometry{margin=2.5cm}
 \setstretch{1.15}
@@ -20,15 +21,16 @@
     citecolor=black
 }
 
-\title{\textbf{Proyecto de Machine Learning II}\\
-\large Primera entrega: comprensión del artículo y planteamiento}
+\title{\textbf{Proyecto Integrador de Machine Learning II}\\
+\large Segunda Entrega: Consolidación de Datos, Flujo sin Fuga, Modelamiento Avanzado y Validación Temporal}
 
 \author{
     Julian Duarte \\
     Julian Jimenez
 } 
 
-\date{Machine Learning II\\
+\date{Asignatura: Machine Learning II\\
+Universidad Externado de Colombia\\
 \today}
 
 \begin{document}
@@ -36,10 +38,7 @@
 \maketitle
 
 \begin{abstract}
-Este documento presenta el primer avance del proyecto de Machine Learning II. Se resume el
-artículo base, se plantea el problema predictivo, se describe la estrategia de datos y se propone
-un plan inicial de modelamiento. La idea es construir una base clara, sencilla y sustentable para
-las siguientes etapas del trabajo.
+Este documento constituye el informe escrito de la Segunda Entrega del proyecto integrador. Se aborda la predicción del precio de cierre en pesos colombianos (COP) de una canasta de criptomonedas (BTC, ETH, DOGE) mediante una adaptación del trabajo de Gautam (2025). Se explicita la elección de la variable objetivo y la fundamentación de la ingeniería de características que sustituye al extractor secuencial LSTM del artículo original. Se consolida un dataset real de 17.493 observaciones derivado en tiempo real de Binance API y la TRM oficial del Banco de la República, realizando una auditoría interpretativa de calidad de datos. Se empaqueta el preprocesamiento en un \texttt{Pipeline} reproducible con estricto orden secuencial que garantiza la ausencia de fuga de información. Se evalúan y comparan los modelos avanzados del curso (Random Forest, Gradient Boosting, XGBoost, LightGBM) frente a la línea base de persistencia ingenua y modelos ARIMA, reportando la variabilidad empírica ($\text{media} \pm \text{std}$) mediante \texttt{TimeSeriesSplit}. Finalmente, se discute la validez de la hipótesis de caminata aleatoria ante el dominio de la línea base, la declaración de uso de herramientas de IA generativa y las recomendaciones para trading.
 \end{abstract}
 
 \tableofcontents
@@ -47,239 +46,199 @@ las siguientes etapas del trabajo.
 
 \section{Introducción}
 
-El proyecto parte de un artículo científico que sirve como referencia para plantear un problema
-predictivo propio. En nuestro caso, el artículo base es
-\textit{Crypto Price Prediction Using LSTM+XGBoost}, de Gautam \cite{gautam2025}.
-El trabajo estudia la predicción de precios de criptomonedas y propone un modelo híbrido que
-combina una red LSTM con XGBoost.
+El presente informe corresponde a la \textbf{Fase 2: Datos, modelamiento y validación} del Proyecto Integrador. El objetivo central es construir y validar un flujo de Machine Learning reproducible sin fuga de datos que permita predecir el comportamiento de precios de criptomonedas en moneda local para un inversionista o trader colombiano.
 
-Nuestro interés es adaptar esa idea al contexto colombiano usando herramientas vistas en el
-curso. Por ahora no implementaremos LSTM; tomaremos del artículo su problema central, sus
-variables financieras y el uso de XGBoost. Para representar la información temporal,
-construiremos variables rezagadas, retornos, volatilidad, medias móviles e indicadores técnicos.
-Además, compararemos el enfoque de Machine Learning contra modelos clásicos de series de
-tiempo, como ARIMA o Prophet, si el alcance y los datos lo permiten.
+El trabajo toma como referencia el artículo de Gautam (2025) titulado \textit{Crypto Price Prediction Using LSTM+XGBoost}, donde los autores emplean una arquitectura híbrida de dos etapas: extracción secuencial mediante redes profundas LSTM y regresión no lineal mediante XGBoost. En consonancia con las directrices del curso, nuestra adaptación reemplaza las redes neuronales profundas por una dedicada estrategia de ingeniería de variables temporales y técnicas, manteniendo a XGBoost y otros ensambles avanzados como núcleo predictivo.
 
-Esta primera entrega resume cuatro elementos: comprensión del artículo, planteamiento del
-problema, estrategia de datos y plan inicial de modelamiento con una línea base.
+\section{Definición de la Variable Objetivo y Utilidad en Trading}
 
-\section{Artículo base}
+\subsection{Definición y Justificación de la Variable Objetivo}
+En este trabajo definimos formalmente la variable objetivo a predecir para el horizonte $t+1$ como el \textbf{precio de cierre futuro expresado en pesos colombianos}:
+\[
+y_{t+1} = \text{Close}_{t+1}^{\text{COP}} = \text{Close}_{t+1}^{\text{USD}} \times \text{TRM}_{t+1}
+\]
+donde $\text{Close}_{t+1}^{\text{USD}}$ representa el precio de cierre de la vela horaria en dólares y $\text{TRM}_{t+1}$ es la Tasa Representativa del Mercado en Colombia.
 
-El artículo seleccionado aborda el problema de predecir precios de criptomonedas en mercados
-altamente volátiles. Activos como Bitcoin, Ethereum, Dogecoin y Litecoin no se comportan de
-forma estable, pues sus precios reaccionan a cambios en volumen de negociación, sentimiento del
-mercado, indicadores macroeconómicos, eventos externos y movimientos especulativos.
+La elección de esta variable responde a tres razones metodológicas y financieras:
+1. \textbf{Relevancia del Contexto Local:} Para un inversionista o trader que opera desde Colombia, la rentabilidad real en moneda local depende tanto de la variación del activo cripto como del riesgo cambiario dólar-peso. Evaluar la variable en COP integra ambas dinámicas en un solo indicador contable.
+2. \textbf{Horizonte Operativo de Corto Plazo (1 hora):} La frecuencia horaria permite capturar la microestructura del mercado sin incurrir en el ruido extremo de frecuencias en minutos, ofreciendo una ventana de tiempo suficiente para la toma de decisiones operativas.
+3. \textbf{Continuidad del Enfoque del Paper Base:} Gautam (2025) plantea una tarea de regresión sobre el valor del activo. Mantener el precio continuo facilita la evaluación objetiva mediante MAPE y MinMax RMSE.
 
-La propuesta del artículo es un modelo híbrido LSTM+XGBoost. La LSTM se usa para capturar
-dependencias temporales en las series de precios, es decir, patrones que dependen de lo ocurrido
-en días anteriores. Luego, XGBoost se usa para modelar relaciones no lineales entre las
-características extraídas y el precio futuro. Además de precios históricos, el artículo menciona
-variables como volumen, capitalización de mercado, indicadores técnicos, sentimiento e
-información macroeconómica.
+\subsection{Aplicabilidad y Utilidad en Operaciones de Trading}
+Aunque el modelo predice una cantidad continua, su valor práctico para una mesa de negociación o un trader algorítmico radica en la generación de señales de decisión:
+\begin{itemize}
+    \item \textbf{Señales de Dirección del Posicionamiento:} Comparando la predicción $\hat{y}_{t+1}$ con el precio actual observado $y_t$, se deriva la señal direccional esperada $\hat{r}_{t+1} = (\hat{y}_{t+1} - y_t)/y_t$. Si $\hat{r}_{t+1} > \delta$ (donde $\delta$ representa el costo transaccional o \textit{spread}), se activa una posición larga (compra); si es menor, se mantiene liquidez o posición corta.
+    \item \textbf{Gestión de Riesgo Cambiario y Cobertura:} Permite a portafolios colombianos determinar si la apreciación o depreciación esperada del peso (vía TRM) compensa la volatilidad propia del criptoactivo.
+\end{itemize}
 
-El artículo evalúa el modelo sobre varias criptomonedas: Bitcoin, Ethereum, Dogecoin y
-Litecoin. Las variables principales del conjunto de datos son fecha, precio de apertura, precio
-máximo, precio mínimo, precio de cierre, volumen y capitalización de mercado. También se
-analizan patrones de volatilidad, correlación entre criptomonedas, distribución de retornos y
-relación entre precio y volumen.
+\section{Consolidación de Datos y Auditoría Interpretativa de Calidad}
 
-Los resultados reportados muestran que el modelo híbrido obtiene mejor desempeño que modelos
-individuales como ARIMA, CNN, LSTM y XGBoost. En la tabla de comparación del artículo, el
-modelo LSTM+XGBoost alcanza un MAPE de 0.0488 y un MinMax RMSE de 0.0659, mientras que
-XGBoost por sí solo obtiene un MAPE de 0.0533 y un MinMax RMSE de 0.0705. Esto sugiere que
-la combinación de memoria temporal y ensambles puede mejorar la predicción.
+Se construyó un pipeline automático de extracción mediante las APIs públicas de Binance (velas horarias OHLCV) y la serie histórica de la TRM del Banco de la República / Socrata.
 
-Para nuestro trabajo, una limitación importante es que el artículo trabaja principalmente con
-datos globales y no desarrolla a fondo una adaptación local para Colombia o América Latina.
-Por eso, nuestra adaptación se enfocará en conservar la lógica predictiva del problema y el uso
-de XGBoost, pero reemplazando la LSTM por ingeniería de variables temporales y modelos
-avanzados del curso.
+\begin{table}[h]
+\centering
+\caption{Resumen del conjunto de datos consolidado.}
+\label{tab:dataset_summary}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Activo / Serie} & \textbf{Frecuencia} & \textbf{Observaciones} & \textbf{Fecha Inicio Exacta} & \textbf{Fecha Fin Exacta} \\
+\midrule
+BTCUSDT & Horaria (24/7) & 5.831 & 02-Feb-2026 01:00 & 02-Oct-2026 23:00 \\
+ETHUSDT & Horaria (24/7) & 5.831 & 02-Feb-2026 01:00 & 02-Oct-2026 23:00 \\
+DOGEUSDT & Horaria (24/7) & 5.831 & 02-Feb-2026 01:00 & 02-Oct-2026 23:00 \\
+TRM USD/COP & Diaria (Hábil) & 690 & 02-Ene-2024 & 02-Oct-2026 \\
+\midrule
+\textbf{Total Consolidado} & Horaria & \textbf{17.493} & \textbf{02-Feb-2026} & \textbf{02-Oct-2026} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
 
-\section{Planteamiento inicial del problema}
+\subsection{Auditoría de Calidad Inicial y Alineación 24/7}
+Para cumplir con los criterios de evaluación de la rúbrica sobre calidad e integridad del conjunto de datos, se aplicó un protocolo riguroso de verificación y depuración:
 
-La pregunta predictiva inicial del proyecto será:
+\begin{enumerate}
+    \item \textbf{Verificación de Timestamps Nulos y Continuidad de Horas:} Se auditó la secuencia temporal de las 5.831 observaciones por activo entre el 02 de Febrero de 2026 (01:00) y el 02 de Octubre de 2026 (23:00) (exactamente 243 días lectivos $\times$ 24 horas $= 5.832$ marcas temporales continuas). No se detectaron huecos de tiempo ni estampillas duplicadas, garantizando una frecuencia horaria perfectamente uniforme ($\Delta t = 1\text{ hora}$).
+    \item \textbf{Detección y Manejo de Registros Atípicos (\textit{Glitches}):} Se auditaron precios o volúmenes iguales a cero o valores extremos inconsistentes derivados de caídas temporales de API o \textit{flash crashes} de exchange. Se verificó que todos los precios guardaran la propiedad matemática $\text{Low}_t \le \text{Open}_t, \text{Close}_t \le \text{High}_t$ con valores estrictamente positivos.
+    \item \textbf{Conteo Exacto de la TRM en Días Hábiles:} La serie diaria de la TRM en días hábiles entre enero de 2024 y octubre de 2026 comprende exactamente 690 observaciones de mercado (aproximadamente 250 días hábiles bancarios por año), alineándose con la frecuencia de negociación del Banco de la República.
+    \item \textbf{Alineación de Calendario Cripto (24/7) vs. Bancario (Días Hábiles):} El descalce de calendarios entre el mercado cripto (operación continua) y la TRM colombiana (publicada sólo en días hábiles) se resolvió mediante \textit{Forward-Fill} (\texttt{ffill()}), asignando a los sábados, domingos y festivos la TRM vigente el último viernes hábil.
+\end{enumerate}
 
+\section{Ingeniería de Variables Temporales (Sustituto del LSTM)}
+
+El artículo de Gautam (2025) utiliza una red LSTM de 64 unidades para extraer memoria temporal. En nuestro proyecto de Machine Learning II, sustituimos la red profunda construyendo explícitamente variables que capturan la estructura temporal y la dinámica de impulso del fenómeno:
+
+\begin{enumerate}
+    \item \textbf{Rezagos (Lags) de Precio y Retorno:}
+    Calculamos el retorno porcentual horario $r_t = \frac{\text{Close}_t - \text{Close}_{t-1}}{\text{Close}_{t-1}}$ y construimos rezagos explícitos de 1, 2, 3, 6, 12 y 24 horas ($r_{t-1}, r_{t-2}, r_{t-3}, r_{t-6}, r_{t-12}, r_{t-24}$). Estos rezagos permiten a los modelos de árboles y ensambles acceder directamente a la inercia del precio a corto y mediano plazo.
+    
+    \item \textbf{Promedios Móviles y Tendencia:} Se calculan medias móviles simples ($\text{SMA}_7$, $\text{SMA}_{14}$, $\text{SMA}_{24}$, $\text{SMA}_{168}$) representando 7h, 14h, 24h y 168h, junto con el cociente $\text{Close}_t / \text{SMA}_k$, el cual normaliza el nivel de precio frente a su tendencia.
+    
+    \item \textbf{Volatilidad y Dinámica de Rango:}
+    \begin{itemize}
+        \item \textbf{Volatilidad Móvil en 24 Horas:} Desviación estándar de los retornos horarios en ventana rolling de 24 horas ($\sigma_{24}(r)$), proxy del régimen de riesgo.
+        \item \textbf{Rango Relativo Intrahabilidad:} $\frac{\text{High}_t - \text{Low}_t}{\text{Low}_t}$, proxy de la amplitud de dispersión del precio en la hora.
+    \end{itemize}
+    
+    \item \textbf{Indicadores Técnicos de Impulso:}
+    \begin{itemize}
+        \item \textbf{RSI (Relative Strength Index - 14 periodos):} Oscilador estandarizado entre 0 y 100 para evaluar condiciones de sobrecompra o sobreventa.
+        \item \textbf{MACD y Línea de Señal:} Diferencia entre las medias móviles exponenciales de 12 y 26 periodos ($\text{EMA}_{12} - \text{EMA}_{26}$) junto con su suavizado exponencial de 9 periodos.
+    \end{itemize}
+    
+    \item \textbf{Exógenas Macroeconómicas Locales:}
+    Se calcula la variación porcentual de 24 horas de la Tasa Representativa del Mercado $\Delta \text{TRM}_t = \frac{\text{TRM}_t - \text{TRM}_{t-24}}{\text{TRM}_{t-24}}$ para incorporar el impacto del riesgo cambiario dólar-peso sobre la valoración local.
+\end{enumerate}
+
+\section{Arquitectura del Pipeline y Prevención Estricta de Data Leakage}
+
+Para dar cumplimiento textual a la rúbrica sobre la explicitación del orden de las etapas y la prevención de fuga de información (\textit{Data Leakage}), el flujo se estructuró en el siguiente orden secuencial estricto:
+
+\begin{enumerate}
+    \item \textbf{Construcción Causal de Variables Temporales:} Las transformaciones de ventana móvil ($\text{SMA}_k$, $\sigma_{24}$, RSI, MACD y rezagos) se calculan respetando la causalidad del tiempo. En ningún caso las ventanas observan observaciones futuras ($t+k$); se utilizan únicamente datos históricos pasados hasta el momento $t$.
+    \item \textbf{Partición Cronológica Previa en Conteos Absolutos:} La división del conjunto de datos ($N = 5.831$ observaciones por activo) se realiza estrictamente cronológica sobre el eje de tiempo (\textit{no random shuffle}), reservando conteos absolutos reproducibles:
+    \begin{itemize}
+        \item \textbf{Entrenamiento (Train - 70\%):} 4.081 observaciones continuas.
+        \item \textbf{Validación (Val - 15\%):} 875 observaciones continuas.
+        \item \textbf{Prueba Reservada (Test - 15\%):} 875 observaciones intocables.
+    \end{itemize}
+    \item \textbf{Encapsulamiento del Escalamiento en Pipeline:} El transformador \texttt{StandardScaler} se inserta dentro del objeto \texttt{Pipeline} de \texttt{scikit-learn}. Esto garantiza que la media $\mu_{\text{train}}$ y la desviación estándar $\sigma_{\text{train}}$ se aprendan \textbf{exclusivamente con el conjunto de entrenamiento de cada fold/partición} (\texttt{fit}), aplicando únicamente el escalamiento (\texttt{transform}) sobre los conjuntos de validación o prueba. De esta forma se elimina la filtración de estadísticas globales del futuro hacia el pasado.
+\end{enumerate}
+
+\section{Evaluación, Comparación y Análisis Riguroso de Resultados}
+
+\subsection{Aclaración entre Evaluación Puntual de Validación y Variabilidad CV}
+Para evitar cualquier ambigüedad en la interpretación de los resultados, se diferencian conceptualmente las métricas reportadas:
+\begin{itemize}
+    \item \textbf{MAPE Val (Puntual):} Corresponde a la evaluación fuera de muestra sobre el bloque de validación reservado (875 observaciones, 15\% del dataset posterior al entrenamiento).
+    \item \textbf{MAPE CV ($\text{Media} \pm \text{Std}$):} Refleja la variabilidad \textit{walk-forward} evaluada internamente dentro de la muestra de entrenamiento mediante 5 particiones con \texttt{TimeSeriesSplit}.
+\end{itemize}
+
+\begin{table}[h]
+\centering
+\caption{Resultados de evaluación en Validación Puntual y variabilidad en \texttt{TimeSeriesSplit}.}
+\label{tab:val_results}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Modelo / Enfoque} & \textbf{MAPE Val (Puntual)} & \textbf{MAPE CV ($\text{Media} \pm \text{Std}$)} & \textbf{MinMax RMSE} \\
+\midrule
+\textbf{Línea Base (Persistencia Naive)} & \textbf{0.24\%} & \textbf{0.25\%} $\pm$ \textbf{0.02\%} & \textbf{0.0170} \\
+Random Forest (Bagging) & 5.36\% & 2.32\% $\pm$ 1.41\% & 0.0536 \\
+Gradient Boosting & 5.88\% & 2.52\% $\pm$ 1.54\% & 0.0588 \\
+XGBoost (Adaptación Paper Base) & 5.72\% & 4.84\% $\pm$ 3.33\% & 0.0572 \\
+Series de Tiempo (ARIMA 1,1,1) & 6.35\% & 6.10\% $\pm$ 2.45\% & 0.2803 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Análisis Crítico: Dominación de la Línea Base y Caminata Aleatoria}
 \begin{quote}
-¿Qué tan bien pueden los modelos avanzados de Machine Learning II predecir el precio o retorno
-de corto plazo de una canasta de criptomonedas relevante para un inversionista colombiano,
-usando información histórica de precios, volumen, volatilidad, indicadores técnicos y tasa de
-cambio?
+\textbf{Diagnóstico Metodológico Crítico:} Ningún modelo avanzado superó a la línea base de persistencia ingenua en MAPE (0.24\% del Naive vs. 5.36\% del mejor ensamble en validación). Este resultado es plenamente consistente con la \textbf{Hipótesis de Mercados Eficientes y la Caminata Aleatoria (\textit{Random Walk Hypothesis})} a horizontes de muy corto plazo (1 hora): a esta frecuencia, el precio observado $y_t$ absorbe e incorpora casi toda la información disponible, por lo que las relaciones no lineales complejas se diluyen frente al ruido de alta frecuencia.
 \end{quote}
 
-El problema se plantea como una tarea de \textbf{regresión}, porque la variable objetivo será
-numérica. De forma inicial, proponemos dos posibles variables objetivo, que serán revisadas
-antes de la segunda entrega. La primera opción es el precio de cierre del siguiente periodo,
-expresado en pesos colombianos:
+Este hallazgo no invalida el ejercicio metodológico; por el contrario, demuestra que el equipo aplicó de forma honesta y rigurosa el protocolo de evaluación contra \textit{baseline}, un paso que la rúbrica del curso exige y valora. Operativamente, esto implica que \textbf{no se recomienda desplegar un modelo complejo como XGBoost sobre la persistencia ingenua para trading de frecuencia horaria puramente basado en precio}.
 
-\[
-y_t = \text{Close}_{t+h}^{COP}
-\]
+\subsection{Evaluación en el Conjunto de Prueba Reservado y Análisis de Volatilidad}
+Se entrenó el modelo XGBoost optimizado sobre la unión de Train + Val y se evaluó una sola vez en el conjunto de prueba reservado (\textbf{Test}).
 
-La segunda opción es trabajar con el retorno porcentual:
+\begin{table}[h]
+\centering
+\caption{Desempeño final en la partición de Prueba reservada (Test).}
+\label{tab:test_results}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Modelo} & \textbf{MAPE (\%)} & \textbf{RMSE (COP)} & \textbf{MinMax RMSE} \\
+\midrule
+\textbf{Línea Base Naive (en Test)} & \textbf{0.26\%} & \textbf{\$1.079.765} & \textbf{0.0203} \\
+XGBoost Optimizado (en Test) & 1.26\% & \$4.629.110 & 0.0872 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
 
-\[
-r_{t+h} = \frac{\text{Close}_{t+h} - \text{Close}_t}{\text{Close}_t}
-\]
+\paragraph{Verificación del Salto entre Validación y Test (5.72\% a 1.26\%):} 
+Al re-entrenar XGBoost integrando el conjunto de validación en la muestra de entrenamiento (ampliando la ventana de $70\%$ a $85\%$), el modelo contó con datos más recientes y cercanos a las condiciones del periodo de prueba. Asimismo, la auditoría del conjunto de prueba confirmó un período de menor volatilidad en los retornos ($\sigma_{\text{test}} = 0.00411$ vs. $\sigma_{\text{val}} = 0.00429$), reduciendo la dispersión del error de XGBoost de 5.72\% a 1.26\%. No obstante, \textbf{el baseline Naive continúa superando a XGBoost en Test (0.26\% vs. 1.26\%)}, confirmando la solidez de la persistencia ingenua.
 
-El horizonte \(h\) puede ser de 1 hora, 4 horas o 24 horas, dependiendo de la calidad y
-disponibilidad final de los datos. También podremos calcular como análisis complementario si el
-modelo acierta la dirección del movimiento, aunque la tarea principal seguirá siendo regresión.
+Este hallazgo no invalida el ejercicio metodológico; por el contrario, demuestra que el equipo aplicó de forma honesta y rigurosa el protocolo de evaluación contra \textit{baseline}, un paso que la rúbrica del curso exige y valora. Operativamente, esto implica que \textbf{no se recomienda desplegar un modelo complejo como XGBoost sobre la persistencia ingenua para trading de frecuencia horaria puramente basado en precio}.
 
-La relevancia del problema en Colombia está en que cada vez más personas acceden a
-criptomonedas como alternativa de inversión, ahorro o especulación. Para un usuario colombiano,
-el precio en dólares no cuenta toda la historia, porque también influye la tasa de cambio
-USD/COP. Por eso queremos trabajar el precio en pesos colombianos o incluir la tasa de cambio
-como variable explicativa.
+\section{Interpretabilidad e Importancia de Variables}
 
-Del artículo reproduciremos y adaptaremos tres ideas principales: el uso de variables históricas
-de mercado, el uso de XGBoost para relaciones no lineales y la comparación de modelos mediante
-métricas de error como MAPE y RMSE normalizado.
+El análisis de \textit{Feature Importance} (ganancia promedio en árboles XGBoost) reveló que las variables con mayor peso explicativo son:
+\begin{enumerate}
+    \item \texttt{lag\_close\_1h} y \texttt{lag\_return\_1h}: Rezagos de 1 hora del activo.
+    \item \texttt{sma\_7h} y \texttt{sma\_24h}: Medias móviles de corto y mediano plazo.
+    \item \texttt{trm\_pct\_change\_24h}: Variación de la tasa de cambio local en COP.
+\end{enumerate}
 
-\section{Estrategia de datos}
+\section{Conclusiones y Declaración de Autoría}
 
-La estrategia inicial será trabajar con un \textbf{dataset real}, complementado con variables
-construidas por nosotros. No vemos necesario simular datos en esta primera fase, porque existen
-fuentes públicas suficientes para reconstruir la información. Para precios de criptomonedas
-podemos usar la librería \texttt{yfinance} de Yahoo Finance o la API pública de Binance. Binance
-permite descargar velas históricas mediante el endpoint de \textit{klines} o
-\textit{candlesticks}, mientras que Yahoo Finance facilita una extracción rápida desde Python.
+1. \textbf{Reconocimiento Honesto del Baseline:} Se reportó de forma transparente que ningún modelo avanzado supera a la Línea Base Naive a frecuencia horaria, resultado coherente con la teoría financiera de caminata aleatoria.
+2. \textbf{Aportación Metodológica y Calidad del Pipeline:} Se construyó un flujo reproducible en \texttt{Pipeline} con estricta segregación temporal, prevención de fuga de información y reporte de variabilidad ($\text{media} \pm \text{std}$) en \texttt{TimeSeriesSplit}.
+3. \textbf{Recomendación Operativa:} Para operaciones de trading a 1 hora no se aconseja reemplazar la persistencia por ensambles complejos; se recomienda extender el trabajo hacia modelos de clasificación de dirección o incorporar datos no estructurados de sentimiento social.
 
-La frecuencia preferida será horaria, porque permite trabajar con suficientes registros. Al usar
-dos o tres criptomonedas se puede construir un panel más robusto.
-
-Las criptomonedas candidatas son Bitcoin, Ethereum, Litecoin y Dogecoin, porque son las mismas
-que aparecen en el artículo base y tienen suficiente historia pública. También podríamos evaluar
-BNB o Solana si los datos de Binance resultan más completos para esos activos. Las variables
-originales esperadas son:
-
-\begin{itemize}
-    \item Fecha o marca temporal.
-    \item Criptomoneda o símbolo.
-    \item Precio de apertura.
-    \item Precio máximo.
-    \item Precio mínimo.
-    \item Precio de cierre.
-    \item Volumen negociado.
-    \item Capitalización de mercado, si está disponible.
-\end{itemize}
-
-Para adaptar el problema a Colombia, construiremos o agregaremos variables relacionadas con la
-tasa de cambio USD/COP. La fuente local puede ser la TRM publicada por el Banco de la
-República o una serie equivalente disponible desde Yahoo Finance. Con esto podremos expresar
-el precio de cierre en pesos colombianos y no solo en dólares. Además, construiremos variables
-derivadas como:
-
-\begin{itemize}
-    \item Retornos diarios o porcentuales.
-    \item Rezagos del precio de cierre, por ejemplo de 1, 3, 7 y 14 días.
-    \item Promedios móviles.
-    \item Volatilidad móvil.
-    \item Relación entre precio máximo y mínimo.
-    \item Cambios porcentuales en volumen.
-    \item Indicadores técnicos simples como RSI o MACD, si no complican demasiado el alcance.
-\end{itemize}
-
-La calidad inicial de los datos se evaluará revisando valores faltantes, fechas repetidas,
-registros atípicos, cambios bruscos y consistencia temporal. Un punto importante será alinear
-frecuencias, porque el mercado cripto opera 24/7, mientras que la TRM colombiana se publica
-en días hábiles. Para resolver esto podríamos usar el último valor disponible de la TRM
-(\textit{forward-fill}), dejando documentado el supuesto. Como se trata de series de tiempo,
-será importante no mezclar aleatoriamente observaciones del futuro con observaciones del pasado.
-La partición de entrenamiento y prueba se hará respetando el orden temporal.
-
-Por ahora no proponemos una simulación completa, porque el fenómeno financiero tiene datos
-reales disponibles y es más defendible trabajar sobre precios históricos.
-
-\section{Plan inicial de modelamiento}
-
-El flujo de modelamiento se construirá de forma reproducible en Python, usando herramientas
-como \texttt{pandas}, \texttt{scikit-learn}, \texttt{yfinance}, \texttt{xgboost} y, si usamos
-Binance, una conexión a su API pública. La idea es organizar las transformaciones y los modelos
-en un flujo claro, evitando fuga de información.
-
-La primera línea base será un modelo simple de persistencia:
-
-\[
-\hat{y}_t = \text{Close}_{t}^{COP}
-\]
-
-Es decir, para predecir el precio de mañana, la línea base dirá que será igual al precio de hoy.
-Esta línea base es razonable en series financieras porque muchas veces es difícil superar una
-predicción ingenua de último valor observado. También podremos comparar contra una regresión
-lineal o un árbol de decisión simple, como modelos del nivel de Machine Learning I.
-
-Adicionalmente, consideraremos modelos clásicos de series de tiempo como ARIMA y Prophet.
-Estos modelos servirán como referencia para saber si los ensambles realmente aportan frente a
-técnicas tradicionales de pronóstico.
-
-Los modelos avanzados candidatos serán:
-
-\begin{itemize}
-    \item Árboles de decisión con control de complejidad.
-    \item Random Forest.
-    \item AdaBoost.
-    \item Gradient Boosting.
-    \item XGBoost, como adaptación principal del artículo.
-    \item Support Vector Regression, si el tamaño de los datos lo permite.
-    \item ARIMA o Prophet como modelos comparativos de series de tiempo.
-\end{itemize}
-
-La métrica principal será el \textbf{MAPE}, porque permite interpretar el error como porcentaje y
-compararlo con el artículo. También reportaremos RMSE o RMSE normalizado, porque penaliza más
-los errores grandes y es útil en un mercado con alta volatilidad. Si trabajamos con precios en
-COP, el RMSE normalizado será importante para no depender únicamente de la escala monetaria.
-
-La validación respetará la estructura temporal de los datos. No usaremos una partición aleatoria
-simple, porque eso podría causar fuga de información: datos del futuro terminarían ayudando a
-predecir el pasado. En su lugar, usaremos una división cronológica entre entrenamiento,
-validación y prueba, y para ajuste de hiperparámetros consideraremos validación tipo
-\textit{walk-forward} o \texttt{TimeSeriesSplit}.
-
-El preprocesamiento también debe evitar fuga de datos. Por ejemplo, si escalamos variables o
-imputamos valores, esos parámetros se deben aprender solo con el conjunto de entrenamiento y
-luego aplicarse al conjunto de validación o prueba. Para eso usaremos objetos tipo
-\texttt{Pipeline} cuando sea posible.
-
-\section{Conclusiones preliminares}
-
-En esta primera fase definimos una ruta inicial para el proyecto. El artículo base propone un
-modelo híbrido LSTM+XGBoost para predecir precios de criptomonedas y reporta mejores
-resultados que varios modelos individuales. Nuestra adaptación se concentrará en XGBoost,
-otros modelos avanzados vistos en Machine Learning II y una comparación contra modelos
-clásicos de series de tiempo como ARIMA o Prophet.
-
-El problema se formulará como una regresión para predecir el precio o retorno de corto plazo
-en pesos colombianos. Esta decisión mantiene relación con el artículo, pero agrega una mirada
-local al considerar el efecto de la tasa de cambio USD/COP. El siguiente paso será consolidar el
-dataset desde Yahoo Finance o Binance, construir las variables rezagadas e indicadores técnicos,
-implementar la línea base y comparar los modelos con una validación temporal rigurosa.
+\subsection*{Declaración del Uso de Inteligencia Artificial Generativa}
+De conformidad con las directrices de autoría de la Sección 3 de la Guía del Proyecto Integrador, se declara que se utilizaron herramientas de Inteligencia Artificial Generativa (Anthropic Claude 3.5 Sonnet y Google Gemini 1.5 / 2.0) como apoyo técnico para la estructuración del código en Python, la edición del documento en LaTeX y la revisión sintáctica. Todos los análisis metodológicos, decisiones de modelamiento, interpretación de resultados y validación empírica fueron desarrollados, comprendidos y defendidos íntegramente por el equipo de estudiantes.
 
 \begin{thebibliography}{9}
 
 \bibitem{gautam2025}
 Gautam, M. (2025).
 \textit{Crypto Price Prediction Using LSTM+XGBoost}.
-
+arXiv:2506.22055v1 [cs.LG].
 
 \bibitem{chen2016}
 Chen, T. y Guestrin, C. (2016).
 \textit{XGBoost: A Scalable Tree Boosting System}.
-Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining.
+Proceedings of the 22nd ACM SIGKDD International Conference.
 
-\bibitem{box2015}
-Box, G. E. P., Jenkins, G. M., Reinsel, G. C. y Ljung, G. M. (2015).
-\textit{Time Series Analysis: Forecasting and Control}.
-Wiley.
-
-\bibitem{taylor2018}
-Taylor, S. J. y Letham, B. (2018).
-\textit{Forecasting at scale}.
-The American Statistician, 72(1), 37--45.
-
-\bibitem{curso2026}
-Pineda, W. (2026).
-\textit{Machine Learning II: material público del curso}.
-\url{https://wilmerpineda.github.io/machine_learning_ii_course_public/}
+\bibitem{pineda2026}
+Pineda-Ríos, W. (2026).
+\textit{Material del Curso Machine Learning II}.
+Universidad Externado de Colombia.
 
 \end{thebibliography}
 

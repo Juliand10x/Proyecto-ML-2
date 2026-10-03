@@ -1,2 +1,33 @@
+# Python / Environment
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Jupyter
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
 *:Zone.Identifier
 *.Zone.Identifier
+
+# LaTeX compilation artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# Data cache (optional, keep directory structure)
+data/*.parquet
+data/*.csv
+!data/.gitkeep
