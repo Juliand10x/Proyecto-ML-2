@@ -27,25 +27,32 @@ El objetivo es predecir el precio de cierre a 1 hora en moneda local ($COP$) par
 
 ```bash
 Proyecto-ML-2/
-├── data/                            # Directorio para almacenamiento de datos (git-ignored parquet/csv)
+├── data/                                 # Directorio para almacenamiento de datos (git-ignored parquet/csv)
 │   └── .gitkeep
-├── docs/                            # Documentación del proyecto y artículos de referencia
+├── docs/                                 # Documentación del proyecto y artículos de referencia
 │   ├── Crypto price prediction using lstm+xgboost.pdf   # Artículo base (Gautam, 2025)
-│   ├── ML2 - Proyecto.pdf           # Rúbrica y guía oficial del proyecto
-│   └── primera_entrega.md          # Documentación de la Fase 1
-├── src/                             # Código fuente modular en Python
-│   ├── data_loader.py               # Extracción desde Binance API & TRM Socrata/yfinance, auditoría 24/7 y ffill
-│   ├── feature_engineering.py       # Rezagos, rolling SMA, volatilidad 24h, RSI-14, MACD y exógenas TRM
-│   └── pipeline.py                  # Scikit-learn Pipeline con StandardScaler y partición temporal estricta
-├── scripts/                         # Scripts auxiliares para la generación del notebook
+│   ├── ML2 - Proyecto.pdf                # Rúbrica y guía oficial del proyecto
+│   └── primera_entrega.md               # Documentación de la Fase 1
+├── notebooks/                            # Cuadernos Jupyter interactivos y reproducibles
+│   ├── notebook_segunda_entrega.ipynb    # Flujo de modelamiento, auditoría y evaluación Fase 2
+│   └── guia_sustentacion_segunda_entrega.ipynb # Guía maestra, resumen ejecutivo y simulador de defensa oral
+├── reports/                              # Informes técnicos y artefactos visuales
+│   ├── informe_proyecto_ml2.tex          # Informe en LaTeX (3-5 páginas) listo para Overleaf / pdflatex
+│   └── figures/                          # Gráficos y visualizaciones exportadas
+│       └── feature_importance.png
+├── src/                                  # Código fuente modular en Python
+│   ├── __init__.py
+│   ├── data_loader.py                    # Extracción desde Binance API & TRM Socrata/yfinance, auditoría 24/7 y ffill
+│   ├── feature_engineering.py            # Rezagos, rolling SMA, volatilidad 24h, RSI-14, MACD y exógenas TRM
+│   └── pipeline.py                       # Scikit-learn Pipeline con StandardScaler y partición temporal estricta
+├── scripts/                              # Scripts auxiliares y constructores reproducibles
 │   ├── build_complete_nb.py
+│   ├── build_defense_nb.py               # Generador del cuaderno maestro de sustentación
 │   ├── create_nb.py
 │   └── run_direct_nb_outputs.py
-├── informe_proyecto_ml2.tex         # Informe en LaTeX (3-5 páginas) listo para Overleaf / pdflatex
-├── notebook_segunda_entrega.ipynb   # Notebook ejecutable con auditorías, validación walk-forward e interpretación
-├── requirements.txt                 # Dependencias del entorno de ejecucion Python
-├── .gitignore                       # Filtros de exclusión de git
-└── README.md                        # Descripción y guía de ejecución del repositorio
+├── requirements.txt                      # Dependencias del entorno de ejecución Python
+├── .gitignore                            # Filtros de exclusión de git
+└── README.md                             # Descripción y guía de ejecución del repositorio
 ```
 
 ---
@@ -75,10 +82,14 @@ pip install -r requirements.txt
 
 ## 🚀 Ejecución del Proyecto
 
-### 1. Ejecutar el Notebook Completo
-Puedes abrir y ejecutar el notebook interactivo directamente:
+### 1. Ejecutar los Notebooks
+Puedes abrir y ejecutar cualquiera de los cuadernos interactivos:
 ```bash
-jupyter notebook notebook_segunda_entrega.ipynb
+# Notebook de Modelamiento y Evaluación Fase 2:
+jupyter notebook notebooks/notebook_segunda_entrega.ipynb
+
+# Cuaderno Maestro y Simulador para la Sustentación Oral:
+jupyter notebook notebooks/guia_sustentacion_segunda_entrega.ipynb
 ```
 
 ### 2. Ejecución Modular en Python
