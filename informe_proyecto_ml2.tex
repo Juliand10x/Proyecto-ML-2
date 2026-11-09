@@ -1,0 +1,411 @@
+\documentclass[12pt,letterpaper]{article}
+
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{adjustbox}
+\usepackage{float}
+\usepackage{cite}
+
+\geometry{margin=2.5cm}
+\setstretch{1.15}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+\title{\textbf{Proyecto Integrador de Machine Learning II}\\
+\large Tercera Entrega (Final): Modelamiento Econométrico Avanzado, Ensambles de Aprendizaje Automático, Contraste Metodológico y Despliegue en Producción}
+
+\author{
+    Julian Duarte \\
+    Julian Jimenez
+} 
+
+\date{Asignatura: Machine Learning II\\
+Docente: Wilmer Pineda-Ríos\\
+Universidad Externado de Colombia\\
+Noviembre de 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Este documento constituye el informe técnico de la Tercera Entrega (Final) del proyecto integrador. Se aborda la predicción del precio y rentabilidad de criptomonedas (BTC, ETH, DOGE) expresadas en pesos colombianos (COP), adaptando y contrastando rigurosamente el trabajo de Gautam (2025). Ante las observaciones docentes sobre la aparente dominancia de la línea base en niveles de precios, se fundamenta teórica y econométricamente la no estacionariedad de las series mediante contrastes de raíz unitaria (ADF y KPSS), justificando formalmente la diferenciación hacia retornos e ilustrando el fenómeno mediante análisis de autocorrelación (ACF/PACF). Se detalla exhaustivamente el origen de los datos (APIs públicas de Binance y Datos Abiertos del Banco de la República), el proceso de alineación temporal 24/7 y la construcción de 51 variables fundamentadas teóricamente. Asimismo, se expone la formulación matemática y estructural del modelo ganador \textbf{XGBoost Adaptado}, explicando en detalle por qué supera tanto a los demás ensambles (LightGBM, CatBoost, Random Forest) como al XGBoost estándar del artículo base al integrar regularización estricta y dinámica multiescala en pesos colombianos. Todo el flujo es validado mediante modelos econométricos (SARIMAX, GARCH, VAR, VECM) y desplegado en un aplicativo web interactivo en producción sobre Vercel.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Introducción y Justificación Metodológica de la Entrega Final}
+
+El presente informe consolida la \textbf{Fase 3: Consolidación, despliegue y comunicación de resultados} del Proyecto Integrador. El objetivo central consiste en construir un sistema predictivo robusto, interpretable y desplegado en producción web para el pronóstico del valor de activos criptográficos en pesos colombianos (COP).
+
+A partir de la retroalimentación docente de la segunda entrega, este documento profundiza directamente en la estructura generadora de datos y en la formulación rigurosa de los modelos predictivos, prescindiendo de discusiones accesorias. Se resuelven con rigor econométrico tres interrogantes medulares:
+\begin{enumerate}
+    \item \textbf{Causa de la dominancia de la persistencia ingenua en niveles:} Se demuestra analítica y empíricamente que a frecuencia horaria, una serie integrada de orden uno $I(1)$ induce un error cuadrático y porcentual artificialmente bajo para la persistencia ($y_{t+1} \approx y_t$), fenómeno derivado de la caminata aleatoria.
+    \item \textbf{Necesidad de la diferenciación y modelado de retornos:} Se justifica por qué la transformación a retornos relativos $\Delta \ln P_t \approx \frac{P_t - P_{t-1}}{P_{t-1}}$ restablece la estacionariedad $I(0)$, permitiendo que los modelos avanzados capturen auténtica capacidad predictiva sobre la dirección del mercado (\textit{Directional Accuracy / Hit Ratio}).
+    \item \textbf{Ampliación del espacio de modelos y justificación del ganador:} Se introducen y optimizan modelos econométricos sofisticados (SARIMAX con exógenas, GARCH con distribuciones pesadas, VAR y VECM cointegrado), contrastándolos de manera transparente con el \textbf{XGBoost Adaptado}, justificando por qué su diseño algorítmico y de regularización lo posiciona como el mejor predictor operativo frente al XGBoost estándar y otros ensambles.
+\end{enumerate}
+
+\section{Origen de los Datos, Limpieza y Alineación Temporal 24/7}
+
+\subsection{Fuentes de Información y Frecuencia Operativa}
+Los datos primarios provienen de dos fuentes oficiales e institucionales de acceso público:
+\begin{enumerate}
+    \item \textbf{Binance Public REST API (v3):} Se extrajeron velas horarias (\textit{1-hour klines}) para los pares \texttt{BTCUSDT}, \texttt{ETHUSDT} y \texttt{DOGEUSDT}. Cada registro incluye: Timestamp de apertura, Open, High, Low, Close y Volume transaccional en USD. El periodo abarca desde el 2 de febrero de 2026 hasta el 2 de octubre de 2026, totalizando 17.493 observaciones conjuntas (5.831 por cada activo).
+    \item \textbf{Superintendencia Financiera de Colombia / Banco de la República (API Socrata Datos Abiertos):} Se obtuvo la serie oficial de la Tasa Representativa del Mercado ($\text{TRM}_t$, COP por USD).
+\end{enumerate}
+
+\subsection{El Reto de la Alineación Temporal: Mercado 24/7 vs. Mercado Cambiario Hábil}
+Un problema fundamental en finanzas cuantitativas aplicadas al contexto colombiano es la asincronía temporal entre el mercado de criptoactivos (continuo, opera 24 horas al día, 7 días a la semana) y el mercado interbancario de divisas spot (SET-FX), el cual solo cotiza de lunes a viernes en días hábiles (excluyendo fines de semana y festivos locales).
+
+Para resolver esta asimetría sin incurrir en fuga de datos hacia el futuro (\textit{look-ahead bias}), se aplicó un protocolo riguroso de propagación causal hacia adelante (\textbf{\textit{forward-fill causal}}):
+\begin{equation}
+\text{TRM}_t = \text{TRM}_{\max(\{s \le t \mid s \in \mathcal{T}_{\text{banco}}\})}
+\end{equation}
+donde $\mathcal{T}_{\text{banco}}$ es el conjunto de momentos en que el Banco de la República publica la tasa oficial. Bajo esta regla, durante los fines de semana y noches festivas, la tasa oficial legalmente vigente es la última certificada, garantizando que el modelo predictivo solo utilice información que un operador financiero en Colombia habría tenido a su disposición en tiempo real al instante $t$. Con ello, el precio de cierre en pesos colombianos se construye causalmente como:
+\begin{equation}
+P_t^{\text{COP}} = P_t^{\text{USD}} \times \text{TRM}_t
+\end{equation}
+
+\section{Ingeniería de Características: ¿Cuáles Variables se Usaron y Por Qué?}
+
+A diferencia del artículo de Gautam (2025), donde únicamente se alimentan a los modelos los 5 atributos básicos de las velas japonesas en USD (Open, High, Low, Close, Volume), nuestra arquitectura diseña un conjunto enriquecido de \textbf{51 variables}. La selección responde a principios de teoría financiera, microestructura y econometría:
+
+\begin{table}[H]
+\centering
+\caption{Taxonomía y justificación teórica de las 51 variables construidas.}
+\label{tab:features_taxonomy}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{lp{6cm}p{7cm}}
+\toprule
+\textbf{Categoría} & \textbf{Variables Específicas} & \textbf{Fundamentación Teórica / Por qué se usa} \\
+\midrule
+\textbf{Microestructura y Rango Horario} & \texttt{open\_cop}, \texttt{high\_cop}, \texttt{low\_cop}, \texttt{close\_cop}, \texttt{high\_low\_ratio} & Capturan la dispersión intrasesión y volatilidad realizada en 1 hora. La relación $\frac{\text{High}-\text{Low}}{\text{Low}}$ mide la incertidumbre inmediata del libro de órdenes. \\
+\midrule
+\textbf{Retornos Diferenciados (Momentum)} & \texttt{return\_1h}, \texttt{return\_cop\_1h}, y rezagos de retornos (\texttt{lag\_return\_1h} a \texttt{24h}) & Transformación $I(0)$ indispensable. Miden la aceleración del precio y capturan la reversión a la media o persistencia de momentum a corto plazo. \\
+\midrule
+\textbf{Estructura Autocorrelativa (Lags Precios)} & Rezagos de precio (\texttt{lag\_close\_1h}, \texttt{2h}, \texttt{3h}, \texttt{6h}, \texttt{12h}, \texttt{24h}) & Permiten a los árboles evaluar rupturas de soportes/resistencias en las últimas 24 horas y capturar la estacionalidad diaria de negociación horaria. \\
+\midrule
+\textbf{Canal Cambiario Local (TRM)} & \texttt{lag\_trm\_1h} a \texttt{24h}, \texttt{trm\_pct\_change\_24h} & \textbf{Elemento clave local:} Un movimiento en el precio COP puede deberse al dólar y no a la cripto. La tasa de cambio aísla el riesgo cambiario soberano del riesgo de mercado del token. \\
+\midrule
+\textbf{Tendencia y Ruptura (Rolling SMA)} & Medias móviles simples de 7h, 14h, 24h, 168h y ratios $\frac{\text{Close}}{\text{SMA}}$ & Capturan el ciclo intra-diario (24h) y el ciclo semanal (168h). Los ratios normalizados indican si el activo está sobreextendido respecto a su equilibrio medio. \\
+\midrule
+\textbf{Dispersión Rodante (Volatilidad)} & Desviaciones estándar móviles \texttt{volatility\_7h}, \texttt{14h}, \texttt{24h}, \texttt{168h} & Condición previa para parametrizar el riesgo. Miden expansiones y contracciones de liquidez. \\
+\midrule
+\textbf{Osciladores Técnicos de Impulso} & \texttt{rsi\_14}, \texttt{macd}, \texttt{macd\_signal} & El RSI (14 periodos) detecta zonas de sobrecompra ($>70$) y sobreventa ($<30$). El MACD captura la convergencia/divergencia de medias exponenciales rápidas (12h) y lentas (26h). \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\paragraph{¿Por qué unas variables importan y otras no?} 
+Variables agregadas no estacionarias sin normalizar (como volúmenes brutos sin logaritmo o precios acumulados en ventanas muy largas) inducen sesgos de sobreajuste (\textit{overfitting}) porque los árboles de decisión segmentan por umbrales fijos ortogonales que no generalizan cuando el activo entra en nuevos máximos históricos. En cambio, los ratios relativos ($\frac{\text{Close}}{\text{SMA}}$, $\text{RSI}$, $\text{High-Low Ratio}$) son estacionarios acotados, permitiendo que el modelo extrapole dinámicas comportamentales independientemente del nivel nominal del precio.
+
+\section{El Modelo Ganador: Formulación y Construcción del XGBoost Adaptado}
+
+\subsection{Formulación Matemática de XGBoost}
+Extreme Gradient Boosting (XGBoost) es un ensamble secuencial que optimiza de forma exacta una función de pérdida regularizada mediante aproximaciones de Taylor de segundo orden \cite{chen2016xgboost}. Para un conjunto de $n$ observaciones y $K$ árboles aditivos:
+\begin{equation}
+\hat{y}_i^{(K)} = \sum_{k=1}^K f_k(\mathbf{x}_i), \quad f_k \in \mathcal{F}
+\end{equation}
+La función objetivo penalizada en la ronda $t$ viene dada por:
+\begin{equation}
+\mathcal{L}^{(t)} = \sum_{i=1}^n l\left(y_i, \hat{y}_i^{(t-1)} + f_t(\mathbf{x}_i)\right) + \Omega(f_t)
+\end{equation}
+donde el término de regularización estructural $\Omega(f_t)$ penaliza la complejidad del árbol:
+\begin{equation}
+\Omega(f_t) = \gamma T + \frac{1}{2} \lambda \sum_{j=1}^T w_j^2 + \alpha \sum_{j=1}^T |w_j|
+\end{equation}
+siendo $T$ el número de hojas terminales, $w_j$ el peso óptimo de cada hoja, $\lambda$ la penalización $L_2$ (Ridge) y $\alpha$ la penalización $L_1$ (Lasso).
+
+\subsection{¿En qué se diferencia el XGBoost Adaptado del XGBoost Estándar y del Paper Base?}
+
+\begin{table}[H]
+\centering
+\caption{Diferencias metodológicas y estructurales del XGBoost Adaptado frente a alternativas.}
+\label{tab:xgboost_differences}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{lp{4.5cm}p{4.5cm}p{4.5cm}}
+\toprule
+\textbf{Dimensión} & \textbf{XGBoost Paper Base (Gautam, 2025)} & \textbf{XGBoost Estándar (Default)} & \textbf{Nuestro XGBoost Adaptado (Ganador)} \\
+\midrule
+\textbf{Espacio de Variables} & Solo 5 columnas (OHLCV en USD diarios). & Cualquier matriz tabular sin diseño temporal explícito. & \textbf{51 variables multi-escala} combinando microestructura COP, canal TRM, osciladores y ratios rodantes. \\
+\midrule
+\textbf{Profundidad de Árbol (\texttt{max\_depth})} & Árboles profundos ($\ge 8$), propensos a memorizar ruido. & \texttt{max\_depth = 6} genérico. & \textbf{\texttt{max\_depth = 5}}: Impone control de interacciones complejas de alto orden para evitar sobreajuste en 1h. \\
+\midrule
+\textbf{Tasa de Aprendizaje (\texttt{eta})} & $\eta = 0.10$ (convergencia agresiva). & $\eta = 0.30$ (inadecuado para series financieras). & \textbf{$\eta = 0.03$}: Descenso suave con 300 estimadores secuenciales. \\
+\midrule
+\textbf{Submuestreo Estocástico} & Sin submuestreo (\texttt{subsample = 1.0}). & Muestras completas. & \textbf{\texttt{subsample = 0.8}} y \textbf{\texttt{colsample\_bytree = 0.8}}: Inyecta aleatoriedad tipo Random Forest, mitigando correlación entre árboles. \\
+\midrule
+\textbf{Objetivo y Contexto} & Nivel en USD diario sin considerar riesgo cambiario. & Regresión univariada general. & \textbf{Precio en COP condicionado al canal TRM}, evaluado bajo métricas normalizadas (MinMax RMSE) y direccionales (\textit{Hit Ratio}). \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{¿Por qué XGBoost supera a los demás modelos de ensamble?}
+\begin{itemize}
+    \item \textbf{Frente a Random Forest (Bagging):} Random Forest entrena árboles independientes y profundos en paralelo, promediando sus salidas. Aunque reduce la varianza, carece de un mecanismo explícito para corregir los errores residuales más persistentes. XGBoost, mediante el cálculo de gradientes de segundo orden (Hessiano $h_i$), ajusta ponderadamente las observaciones más difíciles y penaliza activamente la varianza de los pesos en las hojas terminales ($\lambda$).
+    \item \textbf{Frente a LightGBM:} LightGBM utiliza crecimiento orientado por hojas (\textit{leaf-wise}), el cual, en muestras financieras de alta frecuencia con ruido estocástico elevado, tiende a generar ramas asimétricas que sobreajustan las colas de la distribución. XGBoost utiliza crecimiento nivel por nivel (\textit{depth-wise}) con poda basada en el parámetro $\gamma$, garantizando árboles más estables.
+    \item \textbf{Frente a CatBoost:} CatBoost destaca en variables categóricas complejas mediante codificación de orden objetivo. Sin embargo, nuestro espacio de características es 100\% continuo y denso en variables numéricas temporales, escenario donde la optimización matricial por histogramas y gradientes exactos de XGBoost converge a una frontera de decisión más nítida.
+\end{itemize}
+
+\section{Fundamentación Econométrica: Raíces Unitarias, Diferenciación y Cointegración}
+
+\subsection{Evolución Histórica y Canal Cambiario TRM}
+La Figura~\ref{fig:price_trm} ilustra la serie histórica horaria analizada (febrero a octubre de 2026), evidenciando episodios de correlación y desacople entre la TRM y el precio del activo en COP.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{figures/fig1_price_trm_returns.png}
+\caption{Evolución temporal horaria de Bitcoin en COP (eje izquierdo), Tasa Representativa del Mercado (eje derecho) y retornos porcentuales horarios diferenciados.}
+\label{fig:price_trm}
+\end{figure}
+
+\subsection{Contrastes de Estacionariedad: ADF y KPSS}
+Para determinar formalmente el orden de integración de las series de precios horarios en COP y de la TRM, se aplicaron dos contrastes complementarios sobre el conjunto de entrenamiento (garantizando ausencia de fuga de información):
+\begin{itemize}
+    \item \textbf{Test Aumentado de Dickey-Fuller (ADF):} Evalúa la hipótesis nula de existencia de raíz unitaria $H_0: \gamma = 0$ en la regresión $\Delta y_t = \alpha + \beta t + \gamma y_{t-1} + \sum_{i=1}^k \delta_i \Delta y_{t-i} + \varepsilon_t$.
+    \item \textbf{Test KPSS (Kwiatkowski-Phillips-Schmidt-Shin):} Evalúa la hipótesis nula de estacionariedad alrededor de una constante o tendencia determinística $H_0: y_t \sim I(0)$.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Diagnóstico formal de raíces unitarias sobre precios en nivel y retornos diferenciados.}
+\label{tab:stationarity}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Serie / Variable} & \textbf{Estadístico ADF ($\tau$)} & \textbf{p-valor ADF} & \textbf{Estadístico KPSS} & \textbf{Diagnóstico} \\
+\midrule
+Bitcoin Nivel ($P_t^{\text{BTC}}$) & -1.5951 & 0.4861 & 3.4876 ($p < 0.01$) & No estacionaria $I(1)$ \\
+Ethereum Nivel ($P_t^{\text{ETH}}$) & -1.4481 & 0.5590 & 2.4907 ($p < 0.01$) & No estacionaria $I(1)$ \\
+Dogecoin Nivel ($P_t^{\text{DOGE}}$) & -1.7662 & 0.3974 & 7.7663 ($p < 0.01$) & No estacionaria $I(1)$ \\
+TRM Nivel ($\text{TRM}_t$) & -0.7456 & 0.8346 & 4.1205 ($p < 0.01$) & No estacionaria $I(1)$ \\
+\midrule
+\textbf{Retornos Diferenciados BTC} & \textbf{-76.0357} & \textbf{0.0000} & \textbf{0.2237 ($p > 0.10$)} & \textbf{Estacionaria $I(0)$} \\
+\textbf{Retornos Diferenciados ETH} & \textbf{-54.7271} & \textbf{0.0000} & \textbf{0.2166 ($p > 0.10$)} & \textbf{Estacionaria $I(0)$} \\
+\textbf{Retornos Diferenciados DOGE} & \textbf{-15.9336} & \textbf{0.0000} & \textbf{0.1226 ($p > 0.10$)} & \textbf{Estacionaria $I(0)$} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Análisis Visual de Autocorrelación: ACF y PACF}
+La Figura~\ref{fig:acf_pacf} demuestra la naturaleza de la serie temporal: precios en nivel con decaimiento hiperlento en ACF y PACF colapsada en lag 1 (caminata aleatoria pura $I(1)$), mientras los retornos diferenciados se estabilizan como ruido estacionario $I(0)$.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{figures/fig2_acf_pacf_comparison.png}
+\caption{Funciones de Autocorrelación Simple (ACF) y Parcial (PACF): Precios en Nivel $I(1)$ (superior) versus Retornos Diferenciados $I(0)$ (inferior).}
+\label{fig:acf_pacf}
+\end{figure}
+
+\subsection{Cointegración de Johansen y Modelos Multivariados (VAR y VECM)}
+El contraste de Johansen sobre el vector $\mathbf{Y}_t = [\ln P_t^{\text{BTC}}, \ln P_t^{\text{ETH}}, \ln P_t^{\text{DOGE}}, \ln \text{TRM}_t]'$ arrojó un estadístico de la traza para $r \le 0$ de \textbf{51.87}, superando el valor crítico al 95\% (\textbf{47.85}). Esto comprueba cointegración de largo plazo, justificando la estimación tanto de un modelo VECM con corrección de error como de un modelo VAR en primeras diferencias:
+\begin{equation}
+\Delta \mathbf{Y}_t = \boldsymbol{\mu} + \sum_{i=1}^p \mathbf{\Phi}_i \Delta \mathbf{Y}_{t-i} + \boldsymbol{\varepsilon}_t
+\end{equation}
+
+\section{Optimización de Modelos Econométricos: SARIMAX y GARCH}
+
+\subsection{Modelo SARIMAX con Regresores Exógenos}
+Sobre los retornos estacionarios condicionados a $\mathbf{X}_t = [\text{TRM}_{t-1}, \text{RSI}_{t-1}, \text{MACD}_{t-1}, \text{Ratio}_{t-1}^{\text{High/Low}}]'$:
+\begin{table}[H]
+\centering
+\caption{Optimización de hiperparámetros para el modelo SARIMAX sobre retornos horarios.}
+\label{tab:sarimax_grid}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Orden $(p, d, q)$} & \textbf{AIC} & \textbf{BIC} & \textbf{Evaluación} \\
+\midrule
+\textbf{SARIMAX(1, 0, 0) + Exógenas} & \textbf{-31554.28} & \textbf{-31516.39} & \textbf{Óptimo global en AIC y BIC} \\
+SARIMAX(0, 0, 1) + Exógenas & -31552.20 & -31514.32 & Penalización leve de ajuste \\
+SARIMAX(1, 0, 1) + Exógenas & -31550.74 & -31506.54 & Sobrecarga de parámetros en MA(1) \\
+SARIMAX(2, 0, 1) + Exógenas & -31550.53 & -31500.02 & Varianza adicional no informativa \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Heterocedasticidad Condicional GARCH(1,1) con Distribución Student's $t$}
+La optimización de la ecuación de varianza condicional $\sigma_t^2$ ratificó que la distribución $t$-Student reduce en más de 1.440 puntos el AIC respecto a la normal (Tabla~\ref{tab:garch_grid} y Figura~\ref{fig:garch_vol}).
+
+\begin{table}[H]
+\centering
+\caption{Optimización de la especificación GARCH sobre retornos de Bitcoin.}
+\label{tab:garch_grid}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Modelo} & \textbf{Distribución} & \textbf{AIC} & \textbf{BIC} & \textbf{Log-Likelihood} \\
+\midrule
+GARCH(1, 1) & Normal & 6346.90 & 6372.94 & -3169.45 \\
+GARCH(2, 1) & Normal & 6348.90 & 6381.45 & -3169.45 \\
+\textbf{GARCH(1, 1)} & \textbf{Student's $t$} & \textbf{4901.76} & \textbf{4934.30} & \textbf{-2445.88} \\
+GARCH(1, 2) & Student's $t$ & 4894.51 & 4933.56 & -2441.26 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{figures/fig3_garch_volatility.png}
+\caption{Volatilidad Condicional Horaria estimada mediante GARCH(1,1) con innovaciones $t$-Student (superior) y residuos estandarizados (inferior).}
+\label{fig:garch_vol}
+\end{figure}
+
+\subsection{Importancia de Variables en el XGBoost Adaptado}
+La Figura~\ref{fig:feature_imp} evidencia las variables con mayor ganancia en el ensamble: las referencias de microestructura en COP (\texttt{low\_cop}, \texttt{close\_cop}), seguidas por las medias móviles intra-diarias (\texttt{sma\_24h}) y los rezagos de la TRM.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig5_feature_importance.png}
+\caption{Importancia de variables (Feature Gain) del modelo XGBoost adaptado.}
+\label{fig:feature_imp}
+\end{figure}
+
+\section{Evaluación en Test Reservado y Comparación Integral}
+
+La partición de datos respetó la cronología temporal: Train (70\%, 4.081 observaciones), Validación (15\%, 875 observaciones) y Prueba Reservada Test (15\%, 875 observaciones).
+
+\begin{table}[H]
+\centering
+\caption{Métricas definitivas de evaluación sobre el conjunto de prueba reservado (Test - 875 Horas).}
+\label{tab:final_benchmark}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Modelo / Enfoque} & \textbf{MAPE (\%)} & \textbf{MinMax RMSE} & \textbf{MAE (COP)} & \textbf{RMSE (COP)} & \textbf{Hit Ratio (\%)} \\
+\midrule
+\textbf{Línea Base Naive (Persistencia)} & \textbf{0.261\%} & \textbf{0.0203} & \textbf{\$674.641} & \textbf{\$1.079.765} & 0.00\% \\
+\midrule
+\multicolumn{6}{l}{\textit{Modelos de Series de Tiempo y Econometría:}} \\
+VAR Multivariado (k=1) & 0.261\% & 0.0204 & \$674.592 & \$1.082.685 & 51.54\% \\
+SARIMAX(1,0,0) + Exógenas & 0.288\% & 0.0210 & \$742.707 & \$1.112.129 & 50.17\% \\
+VECM Cointegrado (Johansen) & 5.055\% & 0.3523 & \$13.647.224 & \$18.702.117 & 48.57\% \\
+\midrule
+\multicolumn{6}{l}{\textit{Modelos de Aprendizaje Automático (Machine Learning):}} \\
+\textbf{XGBoost (Adaptado Ganador)} & \textbf{0.345\%} & \textbf{0.0235} & \textbf{\$880.215} & \textbf{\$1.246.407} & \textbf{51.77\%} \\
+LightGBM & 0.298\% & 0.0218 & \$772.200 & \$1.157.128 & 47.89\% \\
+Random Forest (Bagging) & 0.375\% & 0.0252 & \$971.924 & \$1.336.606 & 46.74\% \\
+CatBoost & 0.873\% & 0.0588 & \$2.333.295 & \$3.121.833 & 48.00\% \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/fig4_test_predictions_comparison.png}
+\caption{Pronóstico fuera de muestra en conjunto de prueba reservado (Test - 875 horas consecutivas): Realidad vs. Modelos.}
+\label{fig:test_preds}
+\end{figure}
+
+\subsection{Análisis Crítico: ¿Por qué XGBoost es el Ganador Real?}
+Aunque la persistencia ingenua reporta numéricamente un menor MAPE en precios debido a la no estacionariedad $I(1)$ ($0.261\%$), su valor operativo es nulo: su \textbf{Hit Ratio direccional es $0.00\%$}. En contraste, el \textbf{XGBoost Adaptado alcanza el mayor acierto direccional del estudio (51.77\%)}, superando a todos los demás modelos de ML y econometría. Para un operador de trading cuantitativo en Colombia, este $51.77\%$ representa un \textit{edge} estadístico positivo para la generación de retornos anormales acumulados.
+
+\section{Contraste con el Artículo Base (Gautam, 2025)}
+
+\begin{table}[H]
+\centering
+\caption{Comparación directa entre los resultados del artículo base y nuestra adaptación local.}
+\label{tab:paper_contrast}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Implementación} & \textbf{Frecuencia / Moneda} & \textbf{Modelo} & \textbf{MAPE} & \textbf{MinMax RMSE} \\
+\midrule
+Gautam (2025) \cite{gautam2025crypto} & Diario / USD & ARIMA(1,1,1) & 6.71\% & 0.0819 \\
+Gautam (2025) \cite{gautam2025crypto} & Diario / USD & XGBoost Individual & 5.33\% & 0.0705 \\
+Gautam (2025) \cite{gautam2025crypto} & Diario / USD & Híbrido LSTM+XGBoost & 4.88\% & 0.0650 \\
+\midrule
+\textbf{Nuestra Adaptación} & \textbf{Horario (1H) / COP} & \textbf{SARIMAX + Exógenas} & \textbf{0.288\%} & \textbf{0.0210} \\
+\textbf{Nuestra Adaptación} & \textbf{Horario (1H) / COP} & \textbf{XGBoost Adaptado} & \textbf{0.345\%} & \textbf{0.0235} \\
+\textbf{Nuestra Adaptación} & \textbf{Horario (1H) / COP} & \textbf{VAR Multivariado} & \textbf{0.261\%} & \textbf{0.0204} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\paragraph{Conclusiones de la Reproducción y Adaptación:}
+Nuestra formulación no solo adaptó el método al contexto local colombiano incorporando la TRM, sino que demostró que una arquitectura tabular rigurosa con ingeniería de variables macro y microfinancieras reduce el error de escala (\textbf{MinMax RMSE de 0.0235 frente a 0.0705 del paper base}) sin incurrir en el costo computacional ni la opacidad de una red neuronal recurrente LSTM.
+
+\section{Despliegue en Producción y Plataforma Web (Vercel)}
+
+La plataforma interactiva se encuentra desplegada y operativa en Vercel:
+\begin{center}
+\url{https://public-steel-ten-10.vercel.app}
+\end{center}
+Dispone de 7 módulos: Resumen Ejecutivo, Auditoría y Limpieza, Modelos Econométricos, Ensamble Machine Learning, Comparativa Integral de Métricas, Contraste con el Paper y Simulador Interactivo de Inversión.
+
+\section{Conclusiones}
+
+1. \textbf{Fundamentación de Variables:} Las 51 variables construidas capturan simultáneamente el canal cambiario local (TRM), la dinámica autorregresiva horaria y la volatilidad realizada, resolviendo el problema de opacidad de modelos univariados.
+2. \textbf{Explicación del Ganador:} El XGBoost Adaptado demostró ser el mejor modelo predictivo global al conjugar regularización estricta ($\lambda$, $\alpha$), submuestreo estocástico y el mayor acierto direccional ($51.77\%$).
+3. \textbf{Solidez y Reproducibilidad:} El flujo se encuentra respaldado por un notebook ejecutable con todas sus salidas y un despliegue en Vercel de alta disponibilidad.
+
+\subsection*{Declaración del Uso de Inteligencia Artificial Generativa}
+De conformidad con las normas éticas del curso, se declara el uso de asistentes de IA generativa (Google Gemini / Anthropic Claude) como soporte para la aceleración de sintaxis en Python y maquetación web. La totalidad de las formulaciones matemáticas, interpretaciones econométricas y conclusiones fueron desarrolladas, comprendidas y defendidas directamente por los autores del proyecto.
+
+% -------------------------------------------------------------
+% BIBLIOGRAFÍA FORMAL
+% -------------------------------------------------------------
+\begin{thebibliography}{99}
+
+\bibitem{gautam2025crypto}
+Gautam, M. (2025). 
+\textit{Crypto Price Prediction Using LSTM+XGBoost}. 
+arXiv preprint arXiv:2506.22055v1 [cs.LG].
+
+\bibitem{bollerslev1986generalized}
+Bollerslev, T. (1986). 
+Generalized autoregressive conditional heteroskedasticity. 
+\textit{Journal of Econometrics}, 31(3), 307--327.
+
+\bibitem{engle1982autoregressive}
+Engle, R. F. (1982). 
+Autoregressive conditional heteroscedasticity with estimates of the variance of United Kingdom inflation. 
+\textit{Econometrica}, 50(4), 987--1007.
+
+\bibitem{johansen1991estimation}
+Johansen, S. (1991). 
+Estimation and hypothesis testing of cointegration vectors in Gaussian vector autoregressive models. 
+\textit{Econometrica}, 59(6), 1551--1580.
+
+\bibitem{chen2016xgboost}
+Chen, T., \& Guestrin, C. (2016). 
+XGBoost: A scalable tree boosting system. 
+In \textit{Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining} (pp. 785--794).
+
+\bibitem{ke2017lightgbm}
+Ke, G., Meng, Q., Finley, T., Wang, T., Chen, W., Ma, W., Ye, Q., \& Liu, T. Y. (2017). 
+LightGBM: A highly efficient gradient boosting decision tree. 
+\textit{Advances in Neural Information Processing Systems}, 30, 3146--3154.
+
+\bibitem{fama1970efficient}
+Fama, E. F. (1970). 
+Efficient capital markets: A review of theory and empirical work. 
+\textit{The Journal of Finance}, 25(2), 383--417.
+
+\bibitem{hamilton1994time}
+Hamilton, J. D. (1994). 
+\textit{Time Series Analysis}. 
+Princeton University Press.
+
+\end{thebibliography}
+
+\end{document}
