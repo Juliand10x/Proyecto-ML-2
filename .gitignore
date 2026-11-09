@@ -27,7 +27,14 @@ __pycache__/
 *.fdb_latexmk
 *.synctex.gz
 
-# Data cache (optional, keep directory structure)
+# Data cache
 data/*.parquet
 data/*.csv
 !data/.gitkeep
+data/crypto_trm_dataset.csv
+data/crypto_trm_featured.csv
+
+# Temporary model training caches
+catboost_info/
+.vercel/
+.vercel

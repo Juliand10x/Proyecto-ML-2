@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoPredict COP — Plataforma de Pronóstico Econométrico & ML</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#ecfdf5',
+                            500: '#10b981',
+                            600: '#059669',
+                            900: '#064e3b',
+                        },
+                        darkbg: '#0b0f19',
+                        darkcard: '#111827',
+                        darkborder: '#1f2937'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0b0f19; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #374151; }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-emerald-500/30 selection:text-emerald-300">
+
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-50 backdrop-blur-md bg-[#0b0f19]/90 border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Brand / Logo -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                        <i data-lucide="trending-up" class="w-6 h-6 text-slate-950 font-bold"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg font-bold tracking-tight text-white">CryptoPredict <span class="text-emerald-400">COP</span></span>
+                            <span class="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Entrega 3</span>
+                        </div>
+                        <p class="text-xs text-slate-400">Machine Learning II & Econometría de Series Temporales · Universidad Externado</p>
+                    </div>
+                </div>
+
+                <!-- Authors & Academic Badge -->
+                <div class="hidden md:flex items-center gap-4 text-xs">
+                    <div class="text-right">
+                        <p class="font-medium text-slate-200">Julian Duarte & Julian Jimenez</p>
+                        <p class="text-slate-500">Docente: Wilmer Pineda-Ríos</p>
+                    </div>
+                    <div class="h-8 w-px bg-slate-800"></div>
+                    <a href="https://github.com" target="_blank" class="p-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 transition">
+                        <i data-lucide="github" class="w-5 h-5"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Tab Buttons Bar -->
+            <nav class="flex space-x-1 overflow-x-auto py-2 border-t border-slate-800/60 scrollbar-none">
+                <button data-tab="tab-overview" class="nav-btn px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition border flex items-center gap-2 whitespace-nowrap bg-emerald-500/20 text-emerald-400 border-emerald-500/50">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Resumen General
+                </button>
+                <button data-tab="tab-cleaning" class="nav-btn px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition border border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+                    <i data-lucide="filter" class="w-4 h-4"></i> Limpieza & Features
+                </button>
+                <button data-tab="tab-econometrics" class="nav-btn px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition border border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+                    <i data-lucide="activity" class="w-4 h-4"></i> Econometría (SARIMAX/GARCH/VAR/VECM)
+                </button>
+                <button data-tab="tab-ml" class="nav-btn px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition border border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+                    <i data-lucide="cpu" class="w-4 h-4"></i> Modelos ML (XGBoost/LightGBM/CatBoost)
+                </button>
+                <button data-tab="tab-comparison" class="nav-btn px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition border border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+                    <i data-lucide="git-compare" class="w-4 h-4"></i> Comparación & Validación
+                </button>
+                <button data-tab="tab-paper" class="nav-btn px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition border border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+                    <i data-lucide="book-open" class="w-4 h-4"></i> Contraste Paper (Gautam, 2025)
+                </button>
+                <button data-tab="tab-simulator" class="nav-btn px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition border border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+                    <i data-lucide="calculator" class="w-4 h-4"></i> Simulador de Inversión
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: RESUMEN GENERAL (OVERVIEW) -->
+        <!-- ========================================== -->
+        <section id="tab-overview" class="tab-section space-y-6">
+            <!-- Context Banner -->
+            <div class="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/40 border border-slate-800 shadow-xl relative overflow-hidden">
+                <div class="relative z-10 max-w-3xl">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-3">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Despliegue de Tercera Entrega
+                    </span>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                        Predicción de Criptomonedas en Pesos Colombianos (COP)
+                    </h1>
+                    <p class="mt-2 text-slate-300 text-sm leading-relaxed">
+                        Adaptación y superación metodológica del artículo de <strong class="text-emerald-300">Gautam (2025)</strong>: incorporando el canal cambiario de la TRM oficial de Colombia, pruebas rigurosas de raíces unitarias (ADF/KPSS), cointegración de Johansen y modelos de series de tiempo avanzadas (<strong class="text-cyan-300">SARIMAX, GARCH, VAR y VECM</strong>) frente a algoritmos de ensamble (<strong class="text-emerald-300">XGBoost, LightGBM, CatBoost</strong>) y la línea base de persistencia ingenua.
+                    </p>
+                </div>
+                <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
+            </div>
+
+            <!-- KPI Metric Cards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Card 1 -->
+                <div class="p-5 rounded-xl bg-slate-900/80 border border-slate-800 shadow-sm hover:border-amber-500/40 transition">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400">Línea Base Naive (Test)</span>
+                        <div class="p-2 rounded-lg bg-amber-500/10 text-amber-400"><i data-lucide="history" class="w-4 h-4"></i></div>
+                    </div>
+                    <div class="mt-3">
+                        <h3 id="kpi-naive-mape" class="text-2xl font-bold font-mono text-amber-400">0.261%</h3>
+                        <p class="text-xs text-slate-500 mt-1">Caminata aleatoria $P_{t+1}=P_t$</p>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="p-5 rounded-xl bg-slate-900/80 border border-slate-800 shadow-sm hover:border-emerald-500/40 transition">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400">XGBoost Adaptado (Test)</span>
+                        <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400"><i data-lucide="zap" class="w-4 h-4"></i></div>
+                    </div>
+                    <div class="mt-3">
+                        <h3 id="kpi-xgb-mape" class="text-2xl font-bold font-mono text-emerald-400">0.345%</h3>
+                        <p class="text-xs text-slate-500 mt-1">Paper Gautam 2025: 5.33%</p>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="p-5 rounded-xl bg-slate-900/80 border border-slate-800 shadow-sm hover:border-cyan-500/40 transition">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400">SARIMAX + Exógenas (Test)</span>
+                        <div class="p-2 rounded-lg bg-cyan-500/10 text-cyan-400"><i data-lucide="line-chart" class="w-4 h-4"></i></div>
+                    </div>
+                    <div class="mt-3">
+                        <h3 id="kpi-sarima-mape" class="text-2xl font-bold font-mono text-cyan-400">0.288%</h3>
+                        <p class="text-xs text-slate-500 mt-1">Optimizado por AIC/BIC</p>
+                    </div>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="p-5 rounded-xl bg-slate-900/80 border border-slate-800 shadow-sm hover:border-emerald-500/40 transition">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400">Direccionalidad (Hit Ratio)</span>
+                        <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400"><i data-lucide="compass" class="w-4 h-4"></i></div>
+                    </div>
+                    <div class="mt-3">
+                        <h3 id="kpi-dir-acc" class="text-2xl font-bold font-mono text-emerald-400">51.77%</h3>
+                        <p class="text-xs text-slate-500 mt-1">Ventaja real de trading vs Naive (0%)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Architectural Blueprint / Methodological Summary -->
+            <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
+                <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                    <i data-lucide="git-branch" class="w-5 h-5 text-emerald-400"></i>
+                    Diagnóstico Metodológico: ¿Por qué la persistencia ingenua tuvo menor MAPE en precios?
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-slate-300">
+                    <div class="space-y-2 p-4 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                        <h4 class="font-semibold text-amber-400 flex items-center gap-1.5">
+                            <i data-lucide="alert-circle" class="w-4 h-4"></i> La Trampa del Nivel en Series I(1)
+                        </h4>
+                        <p class="text-xs leading-relaxed text-slate-400">
+                            A frecuencia horaria, predecir el nivel absoluto del precio ($P_{t+1}^{COP}$) otorga una ventaja matemática espuria a la persistencia ingenua ($\hat{P}_{t+1} = P_t$), ya que el activo raramente varía más del 0.2% en 60 minutos. Ningún árbol de decisión puede superar a la identidad previa sin extrapolar error.
+                        </p>
+                    </div>
+                    <div class="space-y-2 p-4 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                        <h4 class="font-semibold text-emerald-400 flex items-center gap-1.5">
+                            <i data-lucide="check-circle" class="w-4 h-4"></i> La Solución Econométrica & ML
+                        </h4>
+                        <p class="text-xs leading-relaxed text-slate-400">
+                            Diferenciar las series (trabajar con retornos $\Delta P_t / P_{t-1}$), modelar la volatilidad condicional con <strong>GARCH</strong>, capturar cointegración de equilibrio a largo plazo con <strong>VECM</strong>, y evaluar la <strong>precisión direccional (Hit Ratio)</strong>, donde los modelos avanzados superan a la persistencia y entregan utilidad real de inversión.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: LIMPIEZA & FEATURE ENGINEERING -->
+        <!-- ========================================== -->
+        <section id="tab-cleaning" class="tab-section hidden space-y-6">
+            <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="filter" class="w-5 h-5 text-emerald-400"></i>
+                        Auditoría de Datos, Estacionariedad y Justificación de Diferenciación
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">
+                        17.493 observaciones horarias (febrero a octubre 2026). Sincronización entre Binance API (mercado 24/7) y la TRM oficial de Colombia (Banco de la República) mediante forward-fill sin fuga de datos.
+                    </p>
+                </div>
+
+                <!-- Tests ADF y KPSS -->
+                <div class="overflow-x-auto rounded-lg border border-slate-800">
+                    <table class="w-full text-left text-xs sm:text-sm">
+                        <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">Transformación / Variable</th>
+                                <th class="p-3">Test ADF ($\tau$ y p-valor)</th>
+                                <th class="p-3">Test KPSS (Stat y p-valor)</th>
+                                <th class="p-3">Diagnóstico Estacionariedad</th>
+                                <th class="p-3">Fundamento Econométrico</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stationarity-table-body">
+                            <!-- Inyectado vía app.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Feature Importance Chart -->
+            <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-semibold text-white">Importancia de Características (Feature Gain - XGBoost)</h3>
+                        <p class="text-xs text-slate-400">Contribución relativa de las variables técnicas y macrofinancieras al modelo predictivo</p>
+                    </div>
+                    <span class="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300 font-mono">51 Features Totales</span>
+                </div>
+                <div class="h-80 w-full">
+                    <canvas id="featureImportanceChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: ECONOMETRÍA AVANZADA -->
+        <!-- ========================================== -->
+        <section id="tab-econometrics" class="tab-section hidden space-y-6">
+            <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="activity" class="w-5 h-5 text-cyan-400"></i>
+                        Modelos Econométricos de Series de Tiempo Complejas
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">
+                        Construcción y optimización sistemática por criterios de información (AIC / BIC) de modelos autorregresivos, heterocedásticos y multivariados.
+                    </p>
+                </div>
+
+                <!-- Grid SARIMAX y GARCH -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- SARIMAX Grid -->
+                    <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                        <h3 class="text-sm font-semibold text-cyan-300 flex items-center gap-1.5">
+                            <i data-lucide="check" class="w-4 h-4"></i> Optimización SARIMAX ($p, d, q$) + Exógenas
+                        </h3>
+                        <p class="text-xs text-slate-400">Grid search sobre retornos diferenciados ($d=0$) incluyendo TRM, RSI y MACD como regresores exógenos:</p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-900 text-slate-400 text-[10px] uppercase border-b border-slate-800">
+                                    <tr>
+                                        <th class="p-2">Orden $(p,d,q)$</th>
+                                        <th class="p-2">AIC</th>
+                                        <th class="p-2">BIC</th>
+                                        <th class="p-2">Justificación</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sarimax-grid-body">
+                                    <!-- Inyectado vía app.js -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- GARCH Grid -->
+                    <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                        <h3 class="text-sm font-semibold text-cyan-300 flex items-center gap-1.5">
+                            <i data-lucide="shield-alert" class="w-4 h-4"></i> Modelado de Volatilidad GARCH ($p, q$)
+                        </h3>
+                        <p class="text-xs text-slate-400">Evaluación de heterocedasticidad condicional y distribución de colas pesadas (Student's t vs Normal):</p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-900 text-slate-400 text-[10px] uppercase border-b border-slate-800">
+                                    <tr>
+                                        <th class="p-2">Modelo</th>
+                                        <th class="p-2">Distribución</th>
+                                        <th class="p-2">AIC</th>
+                                        <th class="p-2">BIC</th>
+                                        <th class="p-2">Log-Lik</th>
+                                        <th class="p-2">Diagnóstico</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="garch-grid-body">
+                                    <!-- Inyectado vía app.js -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cointegración Johansen y Modelos VAR / VECM -->
+                <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                    <h3 class="text-sm font-semibold text-emerald-300 flex items-center gap-1.5">
+                        <i data-lucide="layers" class="w-4 h-4"></i> Dinámica Multivariada: Test de Cointegración de Johansen & VECM
+                    </h3>
+                    <p class="text-xs text-slate-400">
+                        Evaluación de relaciones de equilibrio de largo plazo entre la canasta cripto (BTC, ETH, DOGE) y la tasa de cambio local (TRM):
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-900 text-slate-400 text-[10px] uppercase border-b border-slate-800">
+                                <tr>
+                                    <th class="p-2">Hipótesis Nula</th>
+                                    <th class="p-2">Estadístico de Traza</th>
+                                    <th class="p-2">Valor Crítico 95%</th>
+                                    <th class="p-2">Resultado Empírico</th>
+                                </tr>
+                            </thead>
+                            <tbody id="johansen-table-body">
+                                <!-- Inyectado vía app.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Gráfico de Volatilidad Condicional -->
+                <div class="space-y-2">
+                    <h3 class="text-sm font-semibold text-slate-200">Volatilidad Condicional Estimada por GARCH(1,1)</h3>
+                    <div class="h-64 w-full bg-slate-950/40 p-2 rounded-lg border border-slate-800/80">
+                        <canvas id="garchVolatilityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: MACHINE LEARNING AVANZADO -->
+        <!-- ========================================== -->
+        <section id="tab-ml" class="tab-section hidden space-y-6">
+            <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="cpu" class="w-5 h-5 text-emerald-400"></i>
+                        Ajuste de Ensambles Avanzados en Partición de Prueba Reservada
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">
+                        Desempeño sobre el 15% final (Test reservado de 875 horas consecutivas). Comparación visual entre el precio real en COP y las trayectorias predichas por XGBoost, SARIMAX y la Línea Base.
+                    </p>
+                </div>
+
+                <div class="h-96 w-full bg-slate-950/40 p-3 rounded-lg border border-slate-800">
+                    <canvas id="mlPredictionsChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 5: COMPARACIÓN INTEGRAL & VALIDACIÓN -->
+        <!-- ========================================== -->
+        <section id="tab-comparison" class="tab-section hidden space-y-6">
+            <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="git-compare" class="w-5 h-5 text-amber-400"></i>
+                        Tabla Maestra de Comparación y Métricas de Desempeño
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">
+                        Evaluación integral combinando precisión porcentual (MAPE), error de escala (MinMax RMSE, MAE, RMSE) y capacidad predictiva operativa (Directional Accuracy / Hit Ratio).
+                    </p>
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-slate-800">
+                    <table class="w-full text-left text-xs sm:text-sm">
+                        <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-800">
+                            <tr>
+                                <th class="p-3.5">Modelo / Enfoque</th>
+                                <th class="p-3.5">Familia</th>
+                                <th class="p-3.5 text-right">MAPE Test</th>
+                                <th class="p-3.5 text-right">MinMax RMSE</th>
+                                <th class="p-3.5 text-right">MAE (COP)</th>
+                                <th class="p-3.5 text-right">RMSE (COP)</th>
+                                <th class="p-3.5 text-right">Hit Ratio (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparison-table-body">
+                            <!-- Inyectado vía app.js -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Radar Chart -->
+                <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                    <h3 class="text-sm font-semibold text-slate-200">Balance Multidimensional de Rendimiento (Radar de Criterios)</h3>
+                    <p class="text-xs text-slate-400">Comparativa de fortalezas entre el enfoque heurístico (Naive), econométrico (SARIMAX) y de aprendizaje automático (XGBoost):</p>
+                    <div class="h-80 w-full">
+                        <canvas id="comparisonRadarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 6: CONTRASTE CON EL PAPER (GAUTAM 2025) -->
+        <!-- ========================================== -->
+        <section id="tab-paper" class="tab-section hidden space-y-6">
+            <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="book-open" class="w-5 h-5 text-emerald-400"></i>
+                        Reproducción y Adaptación al Contexto Local: Contraste con Gautam (2025)
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">
+                        Comparación directa frente al artículo base <em>"Crypto Price Prediction Using LSTM+XGBoost"</em> (arXiv:2506.22055).
+                    </p>
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-slate-800">
+                    <table class="w-full text-left text-xs sm:text-sm">
+                        <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">Estudio / Modelo</th>
+                                <th class="p-3">Contexto de Datos</th>
+                                <th class="p-3">MAPE (%)</th>
+                                <th class="p-3">MinMax RMSE</th>
+                                <th class="p-3">Aporte Metodológico</th>
+                            </tr>
+                        </thead>
+                        <tbody id="paper-comparison-body">
+                            <!-- Inyectado vía app.js -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                    <h4 class="text-sm font-semibold text-emerald-400 flex items-center gap-1.5">
+                        <i data-lucide="file-text" class="w-4 h-4"></i> Discusión Crítica de Adaptación y Conclusiones
+                    </h4>
+                    <p id="paper-discussion-text" class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                        <!-- Inyectado vía app.js -->
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 7: SIMULADOR DE INVERSIÓN INTERACTIVO -->
+        <!-- ========================================== -->
+        <section id="tab-simulator" class="tab-section hidden space-y-6">
+            <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="calculator" class="w-5 h-5 text-emerald-400"></i>
+                        Simulador Interactivo de Inversión y Sensibilidad TRM
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">
+                        Explore el impacto financiero de variaciones cambiarias en el peso colombiano y la volatilidad esperada según el modelo seleccionado.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Capital Inicial -->
+                    <div class="space-y-1.5">
+                        <label class="text-xs font-semibold text-slate-300">Capital a Invertir (COP)</label>
+                        <input id="sim-amount" type="number" value="10000000" step="500000" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white font-mono focus:border-emerald-500 focus:outline-none">
+                    </div>
+
+                    <!-- Shift TRM -->
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between items-center">
+                            <label class="text-xs font-semibold text-slate-300">Variación TRM (USD/COP)</label>
+                            <span id="trm-val-badge" class="text-xs font-mono text-cyan-400">0%</span>
+                        </div>
+                        <input id="sim-trm-change" type="range" min="-5" max="5" value="0" step="0.5" class="w-full accent-cyan-400 cursor-pointer">
+                    </div>
+
+                    <!-- Shift Volatilidad -->
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between items-center">
+                            <label class="text-xs font-semibold text-slate-300">Shock de Volatilidad Cripto</label>
+                            <span id="vol-val-badge" class="text-xs font-mono text-emerald-400">0%</span>
+                        </div>
+                        <input id="sim-volatility" type="range" min="-10" max="10" value="0" step="1" class="w-full accent-emerald-400 cursor-pointer">
+                    </div>
+
+                    <!-- Selector Modelo -->
+                    <div class="space-y-1.5">
+                        <label class="text-xs font-semibold text-slate-300">Modelo Predictor Base</label>
+                        <select id="sim-model" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:border-emerald-500 focus:outline-none">
+                            <option value="xgboost">XGBoost Optimizado (Adaptación Paper)</option>
+                            <option value="sarimax">SARIMAX(1,0,1) + Exógenas</option>
+                            <option value="naive">Línea Base Naive (Persistencia)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Simulation Output Box -->
+                <div id="sim-result-box" class="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
+                    <!-- Dinámico vía app.js -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-auto border-t border-slate-800/80 bg-[#0b0f19] py-6">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+            <p>© 2026 Machine Learning II — Proyecto Integrador de Tercera Entrega. Universidad Externado de Colombia.</p>
+            <div class="flex items-center gap-4">
+                <span>Desplegado en <strong class="text-slate-300">Vercel</strong></span>
+                <span>·</span>
+                <span class="text-emerald-400 font-mono">100% Reproducible</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Initialize Lucide Icons & App Scripts -->
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
