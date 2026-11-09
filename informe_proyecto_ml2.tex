@@ -112,7 +112,47 @@ A diferencia del artículo de Gautam (2025), donde únicamente se alimentan a lo
 \end{table}
 
 \paragraph{¿Por qué unas variables importan y otras no?} 
-Variables agregadas no estacionarias sin normalizar (como volúmenes brutos sin logaritmo o precios acumulados en ventanas muy largas) inducen sesgos de sobreajuste (\textit{overfitting}) porque los árboles de decisión segmentan por umbrales fijos ortogonales que no generalizan cuando el activo entra en nuevos máximos históricos. En cambio, los ratios relativos ($\frac{\text{Close}}{\text{SMA}}$, $\text{RSI}$, $\text{High-Low Ratio}$) son estacionarios acotados, permitiendo que el modelo extrapole dinámicas comportamentales independientemente del nivel nominal del precio.
+Variables agregadas no estacionarias sin normalizar (como volúmenes brutos sin logaritmo o precios acumulados en ventanas muy largas) inducen sesgos de sobreajuste (\textit{overfitting}) porque los árboles de decisión segmentan por umbrales fijos ortogonales que no generalizan cuando el activo entra en nuevos máximos históricos. En cambio, los ratios relativos ($\frac{\text{Close}}{\text{SMA}}$, $\text{RSI}$, $\text{High-Low Ratio}$) y los rezagos directos de alta proximidad temporal son estacionarios o cointegrados, permitiendo que el modelo extrapole dinámicas comportamentales independientemente del nivel nominal del precio.
+
+\subsection{Proceso de Selección de Características: Las Variables Definitivas Elegidas}
+A partir del universo inicial de 51 variables candidatas, se aplicó un protocolo de selección jerárquica en dos etapas para definir la matriz predictiva final:
+\begin{enumerate}
+    \item \textbf{Filtro de Colinealidad y Redundancia (VIF y Correlación Cruzada):} Se descartaron variables con correlación superior a 0.98 que no aportaban información marginal ortogonal (como múltiples ventanas consecutivas de SMA o volúmenes sin transformar), mitigando la dispersión del gradiente en los árboles.
+    \item \textbf{Selección Basada en Ganancia en Árbol (\textit{Feature Gain Importance}) y Validación Temporal:} Se priorizaron las variables con mayor aporte relativo al descenso de la función de pérdida durante la validación cruzada con \texttt{TimeSeriesSplit}.
+\end{enumerate}
+
+La Tabla~\ref{tab:selected_features} detalla las variables seleccionadas que componen el núcleo del modelo final y la justificación empírica de su elección.
+
+\begin{table}[H]
+\centering
+\caption{Variables definitivas seleccionadas para el modelo final y justificación de su inclusión.}
+\label{tab:selected_features}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{lp{3.5cm}cp{7.5cm}}
+\toprule
+\textbf{Variable Seleccionada} & \textbf{Dimensión Analítica} & \textbf{Ganancia (\%)} & \textbf{Justificación Específica de su Elección} \\
+\midrule
+\texttt{low\_cop} & Soporte Dinámico Horario & \textbf{51.78\%} & \textbf{Variable más determinante:} En microestructura horaria, el precio mínimo en COP actúa como el piso de liquidación y soporte inmediato. Captura la profundidad de absorción de ventas en el mercado local. \\
+\midrule
+\texttt{close\_cop} & Nivel de Referencia Inmediato & \textbf{32.17\%} & Representa el último consenso de mercado al cierre de la hora $t$. Es el ancla de persistencia estocástica fundamental para proyectar el horizonte $t+1$. \\
+\midrule
+\texttt{open\_cop} & Presión de Apertura & \textbf{9.08\%} & La relación entre \texttt{open\_cop} y \texttt{close\_cop} define la dirección neta de la vela horaria (vela alcista vs. bajista), indicando si la hora previa cerró con momentum a favor de la compra o de la venta. \\
+\midrule
+\texttt{high\_cop} & Resistencia y Techo Horario & \textbf{6.37\%} & Marca el nivel máximo de liquidez alcanzado en la hora. Permite al árbol evaluar si el activo fue rechazado en techos de precios locales. \\
+\midrule
+\texttt{sma\_24h} & Tendencia Diaria (24 horas) & \textbf{0.07\%} & Media móvil del ciclo de negociación de 1 día completo. Aísla las oscilaciones de ruido intradiario respecto a la tendencia predominante de las últimas 24 horas. \\
+\midrule
+\texttt{sma\_14h} y \texttt{sma\_7h} & Inercia de Corto Plazo & \textbf{0.06\%} & Medias móviles de 14h y 7h que capturan el cruce dinámico de momentum (\textit{golden cross / death cross} intradiario) en frecuencias operativas de trading. \\
+\midrule
+\texttt{lag\_trm\_3h} y \texttt{lag\_trm\_6h} & Transmisión Cambiaria TRM & \textbf{0.04\%} & \textbf{Aporte al contexto colombiano:} Capturan el desfase temporal con el que las variaciones del dólar oficial impactan las órdenes de compra/venta en pesos de los exchanges locales. \\
+\midrule
+\texttt{rsi\_14} y \texttt{macd} & Impulso y Agotamiento & \textbf{Top Filtro} & Detectan condiciones extremas de mercado (sobrecompra/sobreventa y convergencia de medias) que advierten giros repentinos en la trayectoria del precio. \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\textbf{Conclusión de la selección:} El análisis confirma que la combinación entre las cuatro variables de microestructura intradiaria en pesos (\texttt{low\_cop}, \texttt{close\_cop}, \texttt{open\_cop}, \texttt{high\_cop}), complementadas con la tendencia diaria (\texttt{sma\_24h}) y los rezagos de la TRM, concentra más del \textbf{99.4\% de la ganancia explicativa} del ensamble. Esto demuestra que en alta frecuencia, la física del libro de órdenes local y el ancla cambiaria en COP dominan sobre osciladores sintéticos de largo plazo, justificando con total claridad por qué se retuvieron estas variables frente al resto.
 
 \section{El Modelo Ganador: Formulación y Construcción del XGBoost Adaptado}
 
@@ -409,3 +449,4 @@ Princeton University Press.
 \end{thebibliography}
 
 \end{document}
+
