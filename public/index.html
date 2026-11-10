@@ -206,14 +206,67 @@
         <!-- TAB 2: LIMPIEZA & FEATURE ENGINEERING -->
         <!-- ========================================== -->
         <section id="tab-cleaning" class="tab-section hidden space-y-6">
+            <!-- Bloque Explicativo 1: Origen de Datos y Enlaces Oficiales -->
+            <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <i data-lucide="database" class="w-5 h-5 text-emerald-400"></i>
+                            1. Fuentes de Datos Oficiales y Alineación Temporal 24/7
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-1">
+                            Integración causal de 17.493 observaciones horarias (febrero a octubre de 2026) combinando mercados globales y tasa de cambio local.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-data" target="_blank" class="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-semibold hover:bg-amber-500/20 transition flex items-center gap-1.5">
+                            <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Binance REST API (v3)
+                        </a>
+                        <a href="https://www.datos.gov.co/resource/32sa-823r.json" target="_blank" class="px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-xs font-semibold hover:bg-cyan-500/20 transition flex items-center gap-1.5">
+                            <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Socrata TRM (BanRep)
+                        </a>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300">
+                    <div class="p-4 rounded-lg bg-slate-950/70 border border-slate-800 space-y-2">
+                        <h4 class="font-semibold text-emerald-400 flex items-center gap-1.5">
+                            <i data-lucide="dollar-sign" class="w-4 h-4"></i> ¿Por qué la conversión a COP? (Doble Riesgo)
+                        </h4>
+                        <p class="leading-relaxed text-slate-400">
+                            Para un inversionista o fondo en Colombia, predecir el activo solo en dólares (como hace Gautam, 2025) es insuficiente. La rentabilidad real en pesos está compuesta por dos fuerzas simultáneas: la volatilidad intrínseca del token criptográfico y la devaluación o apreciación de la moneda local frente al dólar:
+                            <code class="block mt-1 p-1 bg-slate-900 text-emerald-300 font-mono rounded">P_t^{COP} = P_t^{USD} \times TRM_t</code>
+                        </p>
+                    </div>
+                    <div class="p-4 rounded-lg bg-slate-950/70 border border-slate-800 space-y-2">
+                        <h4 class="font-semibold text-cyan-400 flex items-center gap-1.5">
+                            <i data-lucide="clock" class="w-4 h-4"></i> Asincronía 24/7 y Forward-Fill Causal
+                        </h4>
+                        <p class="leading-relaxed text-slate-400">
+                            El mercado cripto cotiza de forma continua (24 horas, 7 días a la semana), mientras la TRM oficial del Banco de la República solo opera en días hábiles bancarios. Se aplicó una regla de propagación causal hacia adelante (<em class="text-slate-200">forward-fill</em>): fines de semana y festivos mantienen la última tasa legal certificada, eliminando cualquier sesgo de anticipación o fuga de datos (<em class="text-slate-200">look-ahead bias</em>).
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Imagen Fig 1 del Paper -->
+                <div class="space-y-2 pt-2">
+                    <h3 class="text-sm font-semibold text-slate-200">Figura 1 del Paper: Evolución Histórica de Precios y Retornos Horarios</h3>
+                    <div class="rounded-lg overflow-hidden border border-slate-800 bg-slate-950/50 p-2">
+                        <img src="figures/fig1_price_trm_returns.png" alt="Figura 1: Evolución de Precios en COP y TRM" class="w-full max-h-[420px] object-contain mx-auto rounded">
+                    </div>
+                    <p class="text-[11px] text-slate-400 italic">Evolución horaria de Bitcoin en COP (eje izquierdo), Tasa Representativa del Mercado (eje derecho) y retornos porcentuales horarios diferenciados.</p>
+                </div>
+            </div>
+
+            <!-- Bloque Explicativo 2: Estacionariedad y Justificación de Diferenciación -->
             <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
                 <div>
                     <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                        <i data-lucide="filter" class="w-5 h-5 text-emerald-400"></i>
-                        Auditoría de Datos, Estacionariedad y Justificación de Diferenciación
+                        <i data-lucide="git-commit" class="w-5 h-5 text-amber-400"></i>
+                        2. Diagnóstico de Raíces Unitarias (ADF & KPSS) y Análisis ACF/PACF
                     </h2>
                     <p class="text-xs text-slate-400 mt-1">
-                        17.493 observaciones horarias (febrero a octubre 2026). Sincronización entre Binance API (mercado 24/7) y la TRM oficial de Colombia (Banco de la República) mediante forward-fill sin fuga de datos.
+                        Demostración matemática de por qué los precios en nivel son caminata aleatoria no estacionaria $I(1)$ y por qué se deben diferenciar a retornos $I(0)$.
                     </p>
                 </div>
 
@@ -234,18 +287,80 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Imagen Fig 2 del Paper (ACF / PACF) -->
+                <div class="space-y-2 pt-2">
+                    <h3 class="text-sm font-semibold text-slate-200">Figura 2 del Paper: Autocorrelación Simple (ACF) y Parcial (PACF)</h3>
+                    <div class="rounded-lg overflow-hidden border border-slate-800 bg-slate-950/50 p-2">
+                        <img src="figures/fig2_acf_pacf_comparison.png" alt="Figura 2: ACF y PACF Precios vs Retornos" class="w-full max-h-[380px] object-contain mx-auto rounded">
+                    </div>
+                    <p class="text-[11px] text-slate-400 italic">Los precios en nivel muestran un decaimiento hiperlento en ACF y PACF colapsada en el lag 1 (caminata aleatoria pura $I(1)$). Tras diferenciar a retornos horarias, la serie se convierte en ruido blanco estacionario $I(0)$.</p>
+                </div>
             </div>
 
-            <!-- Feature Importance Chart -->
+            <!-- Bloque Explicativo 3: Feature Engineering y Selección de Variables -->
             <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between flex-wrap gap-2">
                     <div>
-                        <h3 class="text-base font-semibold text-white">Importancia de Características (Feature Gain - XGBoost)</h3>
-                        <p class="text-xs text-slate-400">Contribución relativa de las variables técnicas y macrofinancieras al modelo predictivo</p>
+                        <h3 class="text-base font-semibold text-white">3. Taxonomía de Variables y Selección Definitiva</h3>
+                        <p class="text-xs text-slate-400">De 51 variables candidatas construidas a las características clave que definen el modelo</p>
                     </div>
-                    <span class="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300 font-mono">51 Features Totales</span>
+                    <span class="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300 font-mono">51 Variables Generadas</span>
                 </div>
-                <div class="h-80 w-full">
+
+                <div class="overflow-x-auto rounded-lg border border-slate-800">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-950 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                            <tr>
+                                <th class="p-2.5">Variable Seleccionada</th>
+                                <th class="p-2.5">Dimensión Analítica</th>
+                                <th class="p-2.5 text-right">Ganancia en Árbol (%)</th>
+                                <th class="p-2.5">Justificación de su Inclusión y Por Qué Importa</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-300 divide-y divide-slate-800/60">
+                            <tr class="bg-emerald-500/10">
+                                <td class="p-2.5 font-mono font-bold text-emerald-400">low_cop</td>
+                                <td class="p-2.5 text-slate-300">Soporte Dinámico Horario</td>
+                                <td class="p-2.5 font-mono text-right font-bold text-emerald-400">51.78%</td>
+                                <td class="p-2.5 text-xs text-slate-300">Variable más determinante: en 1 hora, el mínimo en COP actúa como el piso de liquidación y frontera de absorción de órdenes de venta en los exchanges locales.</td>
+                            </tr>
+                            <tr class="bg-emerald-500/5">
+                                <td class="p-2.5 font-mono font-bold text-emerald-300">close_cop</td>
+                                <td class="p-2.5 text-slate-300">Nivel de Referencia Inmediato</td>
+                                <td class="p-2.5 font-mono text-right font-bold text-emerald-300">32.17%</td>
+                                <td class="p-2.5 text-xs text-slate-300">Último consenso de precio al cierre de la hora $t$. Funciona como el ancla de persistencia estocástica fundamental.</td>
+                            </tr>
+                            <tr>
+                                <td class="p-2.5 font-mono text-cyan-300">open_cop</td>
+                                <td class="p-2.5 text-slate-300">Presión de Apertura</td>
+                                <td class="p-2.5 font-mono text-right text-cyan-300">9.08%</td>
+                                <td class="p-2.5 text-xs text-slate-400">La relación entre open y close define la dirección neta de la vela (alcista o bajista), capturando el momentum inmediato.</td>
+                            </tr>
+                            <tr>
+                                <td class="p-2.5 font-mono text-amber-300">high_cop</td>
+                                <td class="p-2.5 text-slate-300">Resistencia y Techo</td>
+                                <td class="p-2.5 font-mono text-right text-amber-300">6.37%</td>
+                                <td class="p-2.5 text-xs text-slate-400">Nivel máximo alcanzado; permite al ensamble evaluar si el impulso comprador fue rechazado en techos de liquidez.</td>
+                            </tr>
+                            <tr>
+                                <td class="p-2.5 font-mono text-slate-300">sma_24h, sma_14h, sma_7h</td>
+                                <td class="p-2.5 text-slate-300">Ciclo Intradiario & Cruces</td>
+                                <td class="p-2.5 font-mono text-right text-slate-300">0.17%</td>
+                                <td class="p-2.5 text-xs text-slate-400">Medias móviles que aíslan el ciclo diario (24h) y capturan cruces dinámicos de tendencia (golden / death cross intradiario).</td>
+                            </tr>
+                            <tr>
+                                <td class="p-2.5 font-mono text-slate-300">lag_trm_3h, lag_trm_6h</td>
+                                <td class="p-2.5 text-slate-300">Transmisión Cambiaria TRM</td>
+                                <td class="p-2.5 font-mono text-right text-slate-300">0.04%</td>
+                                <td class="p-2.5 text-xs text-slate-400">Capturan el desfase temporal con el que las fluctuaciones cambiarias del peso se reflejan en las posturas del mercado local.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Gráfico de Ganancia de Variables -->
+                <div class="h-80 w-full pt-2">
                     <canvas id="featureImportanceChart"></canvas>
                 </div>
             </div>
@@ -262,7 +377,7 @@
                         Modelos Econométricos de Series de Tiempo Complejas
                     </h2>
                     <p class="text-xs text-slate-400 mt-1">
-                        Construcción y optimización sistemática por criterios de información (AIC / BIC) de modelos autorregresivos, heterocedásticos y multivariados.
+                        Formulación y optimización matemática sistemática por criterios de información (AIC / BIC) para capturar autocorrelación, heterocedasticidad condicional y cointegración multivariada.
                     </p>
                 </div>
 
@@ -273,7 +388,9 @@
                         <h3 class="text-sm font-semibold text-cyan-300 flex items-center gap-1.5">
                             <i data-lucide="check" class="w-4 h-4"></i> Optimización SARIMAX ($p, d, q$) + Exógenas
                         </h3>
-                        <p class="text-xs text-slate-400">Grid search sobre retornos diferenciados ($d=0$) incluyendo TRM, RSI y MACD como regresores exógenos:</p>
+                        <p class="text-xs text-slate-400">
+                            Grid search sobre retornos diferenciados ($d=0$) incluyendo TRM, RSI y MACD como variables exógenas $\mathbf{X}_t$. Se selecciona <strong>SARIMAX(1,0,0)</strong> al minimizar simultáneamente el AIC y el BIC:
+                        </p>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-xs">
                                 <thead class="bg-slate-900 text-slate-400 text-[10px] uppercase border-b border-slate-800">
@@ -296,7 +413,9 @@
                         <h3 class="text-sm font-semibold text-cyan-300 flex items-center gap-1.5">
                             <i data-lucide="shield-alert" class="w-4 h-4"></i> Modelado de Volatilidad GARCH ($p, q$)
                         </h3>
-                        <p class="text-xs text-slate-400">Evaluación de heterocedasticidad condicional y distribución de colas pesadas (Student's t vs Normal):</p>
+                        <p class="text-xs text-slate-400">
+                            Evaluación de agrupamiento de volatilidad (<em class="text-slate-300">volatility clustering</em>). La distribución <strong>Student's $t$</strong> reduce en más de 1.440 puntos el AIC respecto a la normal, confirmando colas pesadas:
+                        </p>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-xs">
                                 <thead class="bg-slate-900 text-slate-400 text-[10px] uppercase border-b border-slate-800">
@@ -317,13 +436,22 @@
                     </div>
                 </div>
 
+                <!-- Figura 3 del Paper: Volatilidad GARCH -->
+                <div class="space-y-2 pt-2">
+                    <h3 class="text-sm font-semibold text-slate-200">Figura 3 del Paper: Volatilidad Condicional Estimada por GARCH(1,1)-t y Residuos</h3>
+                    <div class="rounded-lg overflow-hidden border border-slate-800 bg-slate-950/50 p-2">
+                        <img src="figures/fig3_garch_volatility.png" alt="Figura 3: Volatilidad GARCH y Residuos Estandarizados" class="w-full max-h-[380px] object-contain mx-auto rounded">
+                    </div>
+                    <p class="text-[11px] text-slate-400 italic">Panel superior: picos de volatilidad condicional durante correcciones del mercado. Panel inferior: verificación de residuos estandarizados como ruido blanco con colas pesadas.</p>
+                </div>
+
                 <!-- Cointegración Johansen y Modelos VAR / VECM -->
                 <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
                     <h3 class="text-sm font-semibold text-emerald-300 flex items-center gap-1.5">
-                        <i data-lucide="layers" class="w-4 h-4"></i> Dinámica Multivariada: Test de Cointegración de Johansen & VECM
+                        <i data-lucide="layers" class="w-4 h-4"></i> Dinámica Multivariada: Test de Cointegración de Johansen & VAR/VECM
                     </h3>
                     <p class="text-xs text-slate-400">
-                        Evaluación de relaciones de equilibrio de largo plazo entre la canasta cripto (BTC, ETH, DOGE) y la tasa de cambio local (TRM):
+                        Evaluación de relaciones de equilibrio de largo plazo entre la canasta cripto (BTC, ETH, DOGE) y la tasa de cambio local (TRM). El estadístico de la traza ($51.87 > 47.85$) confirma la presencia de cointegración:
                     </p>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs">
@@ -342,9 +470,9 @@
                     </div>
                 </div>
 
-                <!-- Gráfico de Volatilidad Condicional -->
+                <!-- Gráfico Interactivo de Volatilidad GARCH -->
                 <div class="space-y-2">
-                    <h3 class="text-sm font-semibold text-slate-200">Volatilidad Condicional Estimada por GARCH(1,1)</h3>
+                    <h3 class="text-sm font-semibold text-slate-200">Serie Interactiva: Volatilidad Condicional Horaria Estimada</h3>
                     <div class="h-64 w-full bg-slate-950/40 p-2 rounded-lg border border-slate-800/80">
                         <canvas id="garchVolatilityChart"></canvas>
                     </div>
@@ -356,19 +484,60 @@
         <!-- TAB 4: MACHINE LEARNING AVANZADO -->
         <!-- ========================================== -->
         <section id="tab-ml" class="tab-section hidden space-y-6">
+            <!-- Bloque Explicativo del Ganador -->
             <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
                 <div>
                     <h2 class="text-xl font-bold text-white flex items-center gap-2">
                         <i data-lucide="cpu" class="w-5 h-5 text-emerald-400"></i>
-                        Ajuste de Ensambles Avanzados en Partición de Prueba Reservada
+                        El Modelo Ganador: Formulación y Construcción del XGBoost Adaptado
                     </h2>
                     <p class="text-xs text-slate-400 mt-1">
-                        Desempeño sobre el 15% final (Test reservado de 875 horas consecutivas). Comparación visual entre el precio real en COP y las trayectorias predichas por XGBoost, SARIMAX y la Línea Base.
+                        ¿Por qué nuestro XGBoost Adaptado supera a los demás ensambles (LightGBM, CatBoost, Random Forest) y al XGBoost estándar del paper base?
                     </p>
                 </div>
 
-                <div class="h-96 w-full bg-slate-950/40 p-3 rounded-lg border border-slate-800">
-                    <canvas id="mlPredictionsChart"></canvas>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div class="p-4 rounded-lg bg-slate-950/70 border border-slate-800 space-y-2">
+                        <h4 class="font-semibold text-emerald-400 flex items-center gap-1.5">
+                            <i data-lucide="layers" class="w-4 h-4"></i> Espacio de Variables Enriquecido
+                        </h4>
+                        <p class="text-slate-400 leading-relaxed">
+                            A diferencia de Gautam (2025) que solo emplea 5 columnas brutas en USD, alimentamos 51 variables que integran microestructura local en COP, osciladores de impulso y el canal cambiario de la TRM.
+                        </p>
+                    </div>
+                    <div class="p-4 rounded-lg bg-slate-950/70 border border-slate-800 space-y-2">
+                        <h4 class="font-semibold text-cyan-400 flex items-center gap-1.5">
+                            <i data-lucide="shield" class="w-4 h-4"></i> Regularización y Control de Ruido
+                        </h4>
+                        <p class="text-slate-400 leading-relaxed">
+                            Se restringió la profundidad a <code class="text-cyan-300">max_depth = 5</code> con tasa de aprendizaje suave (<code class="text-cyan-300">\eta = 0.03</code>) y submuestreo estocástico (<code class="text-cyan-300">0.8</code>), evitando que los árboles memoricen el ruido de alta frecuencia horaria.
+                        </p>
+                    </div>
+                    <div class="p-4 rounded-lg bg-slate-950/70 border border-slate-800 space-y-2">
+                        <h4 class="font-semibold text-amber-400 flex items-center gap-1.5">
+                            <i data-lucide="target" class="w-4 h-4"></i> Superioridad Direccional (Hit Ratio)
+                        </h4>
+                        <p class="text-slate-400 leading-relaxed">
+                            Alcanza el mayor acierto direccional de todo el estudio (<strong class="text-emerald-400">51.77%</strong>), entregando el único <em class="text-slate-200">edge</em> estadístico real y positivo para la toma de decisiones financieras en Colombia.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Imagen Fig 4 del Paper: Test Predictions -->
+                <div class="space-y-2 pt-2">
+                    <h3 class="text-sm font-semibold text-slate-200">Figura 4 del Paper: Pronóstico Fuera de Muestra en Partición de Prueba Reservada (Test - 875 Horas)</h3>
+                    <div class="rounded-lg overflow-hidden border border-slate-800 bg-slate-950/50 p-2">
+                        <img src="figures/fig4_test_predictions_comparison.png" alt="Figura 4: Comparación Final de Modelos en Test" class="w-full max-h-[400px] object-contain mx-auto rounded">
+                    </div>
+                    <p class="text-[11px] text-slate-400 italic">Curvas comparativas evaluadas sobre el 15% final reservado (875 horas consecutivas). Muestra el seguimiento fiel de la trayectoria real por parte del XGBoost Adaptado frente a la inercia del Naive y la suavización del SARIMAX.</p>
+                </div>
+
+                <!-- Gráfico Interactivo de Predicciones -->
+                <div class="space-y-2 pt-2">
+                    <h3 class="text-sm font-semibold text-slate-200">Serie Interactiva: Explorador de Predicciones en Tiempo Real (Zoom & Tooltips)</h3>
+                    <div class="h-96 w-full bg-slate-950/40 p-3 rounded-lg border border-slate-800">
+                        <canvas id="mlPredictionsChart"></canvas>
+                    </div>
                 </div>
             </div>
         </section>
@@ -541,3 +710,4 @@
     </script>
 </body>
 </html>
+
