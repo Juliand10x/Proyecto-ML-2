@@ -242,7 +242,9 @@
                         </h4>
                         <p class="leading-relaxed text-slate-400">
                             Para un inversionista o fondo en Colombia, predecir el activo solo en dólares (como hace Gautam, 2025) es insuficiente. La rentabilidad real en pesos está compuesta por dos fuerzas simultáneas: la volatilidad intrínseca del token criptográfico y la devaluación o apreciación de la moneda local frente al dólar:
-                            <code class="block mt-1 p-1 bg-slate-900 text-emerald-300 font-mono rounded">P_t^{COP} = P_t^{USD} \times TRM_t</code>
+                            <div class="mt-2 p-2 bg-slate-900/90 border border-emerald-500/20 text-emerald-300 rounded text-center text-sm">
+                                $$P_t^{\text{COP}} = P_t^{\text{USD}} \times \text{TRM}_t$$
+                            </div>
                         </p>
                     </div>
                     <div class="p-4 rounded-lg bg-slate-950/70 border border-slate-800 space-y-2">
@@ -517,7 +519,7 @@
                             <i data-lucide="shield" class="w-4 h-4"></i> Regularización y Control de Ruido
                         </h4>
                         <p class="text-slate-400 leading-relaxed">
-                            Se restringió la profundidad a <code class="text-cyan-300">max_depth = 5</code> con tasa de aprendizaje suave (<code class="text-cyan-300">\eta = 0.03</code>) y submuestreo estocástico (<code class="text-cyan-300">0.8</code>), evitando que los árboles memoricen el ruido de alta frecuencia horaria.
+                            Se restringió la profundidad a <code class="text-cyan-300 font-mono">max_depth = 5</code> con tasa de aprendizaje suave ($\eta = 0.03$) y submuestreo estocástico (<code class="text-cyan-300 font-mono">subsample = 0.8</code>), evitando que los árboles memoricen el ruido de alta frecuencia horaria.
                         </p>
                     </div>
                     <div class="p-4 rounded-lg bg-slate-950/70 border border-slate-800 space-y-2">
