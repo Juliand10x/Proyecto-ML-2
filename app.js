@@ -9,7 +9,24 @@ document.addEventListener('DOMContentLoaded', () => {
     initComparisonTab();
     initPaperTab();
     initSimulator();
+    renderMath();
 });
+
+// Renderizador KaTeX para fórmulas matemáticas
+function renderMath() {
+    if (window.renderMathInElement) {
+        renderMathInElement(document.body, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
+            ],
+            throwOnError: false,
+            ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        });
+    }
+}
 
 // 1. Manejo de Pestañas con transición suave
 function initNavigation() {
@@ -33,6 +50,7 @@ function initNavigation() {
                     sec.classList.add('hidden');
                 }
             });
+            renderMath();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
     });
